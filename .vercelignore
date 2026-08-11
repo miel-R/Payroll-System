@@ -7,6 +7,9 @@ database
 data/__pycache__
 *.log
 
+# Self-hosted deployment folder (kept in the repo, not deployed here)
+local-deploy
+
 # Real database credentials (never uploaded)
 config/db_credentials.php
 

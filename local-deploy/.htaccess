@@ -1,0 +1,14 @@
+# Block direct access to private directories and log files.
+# This folder is served directly by Apache (no Vercel router involved).
+
+RedirectMatch 403 ^/config/
+RedirectMatch 403 ^/database/
+RedirectMatch 403 ^/data/
+
+<FilesMatch "\.(log|sql)$">
+    Require all denied
+</FilesMatch>
+
+# Basic hardening
+Options -Indexes
+ServerSignature Off

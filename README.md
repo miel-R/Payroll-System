@@ -14,6 +14,20 @@ layout and math of the source spreadsheet ("GENERAL PAYROLL.xlsx").
 - Server-rendered pages with progressive AJAX (fast saves + toasts) and a
   light/dark sidebar theme.
 
+## Deployment options
+
+Two ways to run this app:
+
+**Option A — Vercel (free cloud).** Recommended to get it online quickly — no
+server to manage. PHP runs via the community `vercel-php` runtime with
+DB-backed sessions. See [Deploying to Vercel](#deploying-to-vercel).
+
+**Option B — Local / self-hosted.** Run it on your own machine (XAMPP) or any
+plain PHP + MySQL host (InfinityFree, cPanel) with no Vercel files at all. Grab
+the ready-made [`local-deploy/`](local-deploy/README.md) folder and follow its
+guide; it is regenerated from the main app by `tools/build_local_deploy.php`
+(`php tools/build_local_deploy.php`).
+
 ## Tech stack
 
 - PHP 8+ with PDO (MySQL / MariaDB)
@@ -21,6 +35,10 @@ layout and math of the source spreadsheet ("GENERAL PAYROLL.xlsx").
 - Local CSS/JS in `assets/css/app.css` and `assets/js/app.js`
 
 ## Local setup (XAMPP)
+
+> Prefer a drop-in copy without any Vercel files? Use the
+> [`local-deploy/`](local-deploy/README.md) folder instead — same steps,
+> already stripped of `api/`, `vercel.json`, and other cloud-only files.
 
 1. Start Apache + MySQL in XAMPP.
 2. Create the database and tables:
