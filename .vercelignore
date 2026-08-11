@@ -1,0 +1,16 @@
+# Local / dev-only files that must not ship to Vercel
+.git
+.vscode
+session-ses_020f.md
+tools
+database
+data/__pycache__
+*.log
+
+# Real database credentials (never uploaded)
+config/db_credentials.php
+
+# Dev-only pages (also not whitelisted in api/index.php)
+test_db.php
+check_user.php
+create_user.php

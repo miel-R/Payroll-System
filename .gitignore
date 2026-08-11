@@ -1,0 +1,21 @@
+# Editor
+.vscode/
+
+# Session transcript leftover
+session-ses_020f.md
+
+# Real database credentials (never commit)
+config/db_credentials.php
+
+# Logs
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Vendored Bootstrap copies - unused, the app loads Bootstrap from the CDN
+assets/css/bootstrap*.css
+assets/css/bootstrap*.css.map
+assets/js/bootstrap*.js
+assets/js/bootstrap*.js.map
