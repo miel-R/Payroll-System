@@ -118,7 +118,12 @@
     }
 
     async function ajaxSubmit(form) {
-        const url = form.action || window.location.href;
+        // Use getAttribute() here: a form field named "action" or "method"
+        // (e.g. <input name="action" value="save">) shadows the form.action /
+        // form.method DOM properties, which made fetch POST to
+        // "/[object HTMLInputElement]" and fail every AJAX save.
+        const url = form.getAttribute('action') || window.location.href;
+        const method = (form.getAttribute('method') || 'POST').toUpperCase();
         const btn = form.querySelector('[type="submit"]');
         const orig = btn ? btn.innerHTML : '';
         if (btn) {
@@ -128,7 +133,7 @@
         closeOpenModals();
         try {
             const resp = await fetch(url, {
-                method: form.method || 'POST',
+                method: method,
                 body: new FormData(form),
                 headers: { 'X-Requested-With': 'fetch' },
                 credentials: 'same-origin'
