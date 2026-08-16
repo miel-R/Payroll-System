@@ -132,7 +132,7 @@ $sheets = array_chunk($stub_rows, 5);
     <form method="get" class="row g-3 align-items-end">
         <div class="col-lg-3">
             <label class="form-label small mb-1" for="psSite">Site</label>
-            <select class="form-select" id="psSite" name="site_id">
+            <select class="form-select" id="psSite" name="site_id" onchange="this.form.submit()">
                 <option value="">-- Select site --</option>
                 <?php foreach ($sites as $s): ?>
                     <option value="<?php echo (int)$s['id']; ?>" <?php echo $site_id === (int)$s['id'] ? 'selected' : ''; ?>>
@@ -143,7 +143,7 @@ $sheets = array_chunk($stub_rows, 5);
         </div>
         <div class="col-lg-3">
             <label class="form-label small mb-1" for="psPayroll">Payroll Week</label>
-            <select class="form-select" id="psPayroll" name="payroll_id" <?php echo $site_id > 0 ? '' : 'disabled'; ?>>
+            <select class="form-select" id="psPayroll" name="payroll_id" onchange="this.form.submit()">
                 <option value="">-- Select week --</option>
                 <?php foreach ($payrolls as $p): ?>
                     <option value="<?php echo (int)$p['id']; ?>" <?php echo $payroll_id === (int)$p['id'] ? 'selected' : ''; ?>>
@@ -154,15 +154,14 @@ $sheets = array_chunk($stub_rows, 5);
         </div>
         <div class="col-lg-2">
             <label class="form-label small mb-1" for="psScope">Print</label>
-            <select class="form-select" id="psScope" name="scope">
+            <select class="form-select" id="psScope" name="scope" onchange="this.form.submit()">
                 <option value="person" <?php echo $scope === 'person' ? 'selected' : ''; ?>>Per Person</option>
                 <option value="site" <?php echo $scope === 'site' ? 'selected' : ''; ?>>Per Site (Whole Week)</option>
             </select>
         </div>
         <div class="col-lg-3">
             <label class="form-label small mb-1" for="psWorker">Worker</label>
-            <select class="form-select" id="psWorker" name="worker"
-                <?php echo ($scope === 'person' && $payroll_id > 0) ? '' : 'disabled'; ?>>
+            <select class="form-select" id="psWorker" name="worker" onchange="this.form.submit()">
                 <option value="">-- Pick worker --</option>
                 <?php foreach ($entries as $e): ?>
                     <option value="<?php echo (int)$e['site_employee_id']; ?>" <?php
