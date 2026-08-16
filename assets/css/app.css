@@ -514,6 +514,44 @@ a {
     letter-spacing: 0.03em;
 }
 
+/* ===== PAYSLIP STUBS ===== */
+.payslip-stub {
+    border: 1px solid #999;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    background: #fff;
+    color: #000;
+}
+.payslip-stub .ps-head {
+    display: flex;
+    gap: 8px;
+    font-weight: 700;
+    border-bottom: 1px solid #bbb;
+    padding-bottom: 3px;
+    margin-bottom: 4px;
+}
+.payslip-stub .ps-week {
+    margin-left: auto;
+    font-weight: 600;
+}
+.payslip-stub .ps-line {
+    font-size: 0.78rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    line-height: 1.4;
+}
+.payslip-stub .ps-lbl {
+    color: #555;
+}
+.payslip-stub .ps-net {
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-top: 1px solid #bbb;
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
 /* ===== PRINT ===== */
 @media print {
     .sidebar,
@@ -572,6 +610,20 @@ a {
     td {
         color: #000 !important;
         background-color: #fff !important;
+    }
+
+    /* 5 payslips per sheet: one printed page per sheet, stubs never split */
+    .payslip-sheet {
+        page-break-after: always;
+    }
+
+    .payslip-sheet:last-child {
+        page-break-after: auto;
+    }
+
+    .payslip-stub {
+        page-break-inside: avoid;
+        border-color: #000 !important;
     }
 }
 

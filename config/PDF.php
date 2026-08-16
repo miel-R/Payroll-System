@@ -76,6 +76,22 @@ final class PrPdf
         );
     }
 
+    public function box($x, $y, $w, $h) {
+        $this->content .= sprintf("%s %s %s %s re S\n", prPdfNum($x), prPdfNum($y), prPdfNum($w), prPdfNum($h));
+    }
+
+    public function textAt($x, $baseline, $size, $style, $str) {
+        $this->rawText($x, $baseline, $size, $style, $str);
+    }
+
+    public function getY() {
+        return $this->y;
+    }
+
+    public function setY($v) {
+        $this->y = $v;
+    }
+
     public function heading($text) {
         $this->ensureSpace(28);
         $this->y -= 16;
@@ -370,52 +386,85 @@ function prPdfSiteBackup($site, $workers, $payrolls, $payrollEntriesById, $advan
 }
 
 /**
- * One worker's payslip for one payroll week (money detail + attendance days).
- * $entry must already be run through prWithCalc() (has basic/ot_pay/gross/net).
+ * Draw one compact payslip stub (employee details only) inside a box.
+ * 5 of these fit on one portrait page.
+ */
+function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week) {
+    $pad = 6;
+    $x1 = $x + $pad;
+    $size = 7;
+    $pdf->box($x, $top - $h, $w, $h);
+
+    // Header: PAYSLIP (left) + site (right)
+    $pdf->textAt($x1, $top - 10, 8.5, 'B', 'PAYSLIP');
+    $siteStr = (string)$site_name;
+    $pdf->textAt($x + $w - $pad - strlen($siteStr) * 7 * 0.5, $top - 10, 7, 'N', $siteStr);
+
+    // Worker / rate / days / OT
+    $pdf->textAt($x1, $top - 21, $size, 'N',
+        'Worker: ' . (string)$e['name']
+        . '    Rate/Day: ' . prMoney($e['rate'])
+        . '    Days: ' . number_format((float)$e['days_worked'], 1)
+        . '    OT hrs (prev): ' . number_format((float)$e['ot_hours'], 1));
+
+    // Earnings
+    $pdf->textAt($x1, $top - 32, $size, 'N',
+        'Basic: ' . prMoney($e['basic'])
+        . '    OT Pay: ' . prMoney($e['ot_pay'])
+        . '    Flat: ' . prMoney($e['flat_pay'])
+        . '    GROSS: ' . prMoney($e['gross']));
+
+    // Deductions
+    $pdf->textAt($x1, $top - 43, $size, 'N',
+        'Per. Cash Adv: ' . prMoney($e['personal_cash_advance'])
+        . '    Cash Adv: ' . prMoney($e['cash_advance'])
+        . '    Deduction: ' . prMoney($e['deduction']));
+
+    // Week + NET PAY
+    $weekStr = (string)$week;
+    $pdf->textAt($x + $w - $pad - strlen($weekStr) * 7 * 0.5, $top - 43, 7, 'N', $weekStr);
+    $netStr = 'NET PAY: ' . prMoney($e['net']);
+    $pdf->textAt($x + $w - $pad - strlen($netStr) * 8.5 * 0.5, $top - 54, 8.5, 'B', $netStr);
+}
+
+/**
+ * Payslips for one or more workers of a payroll week (employee details only).
+ * Layout: 5 compact stubs per portrait page, each worker's stub drawn in a box.
+ */
+function prPdfPaySlips($payroll, $entries, $site_name) {
+    $pdf = new PrPdf('PAYSLIPS');
+    $pdf->heading('PAYSLIPS');
+    $pdf->paragraph(prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end'])
+        . '   |   ' . (string)$site_name . '   |   ' . count($entries) . ' worker(s)', 8.5);
+    $pdf->spacer(6);
+
+    $per = 5;
+    $stubH = 128;
+    $gap = 8;
+    $x = PrPdf::ML;
+    $w = PrPdf::W - PrPdf::ML - PrPdf::MR;
+    $week = prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']);
+
+    $i = 0;
+    foreach ($entries as $e) {
+        if ($i > 0 && $i % $per === 0) {
+            $pdf->pageBreak();
+        }
+        if ($pdf->getY() - $stubH < 34) {
+            $pdf->pageBreak();
+        }
+        $top = $pdf->getY();
+        prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $stubH, $site_name, $week);
+        $pdf->setY($top - $stubH - $gap);
+        $i++;
+    }
+
+    return $pdf->finish();
+}
+
+/**
+ * Single worker payslip (same compact stub format).
  */
 function prPdfPaySlip($payroll, $entry, $site_name) {
-    $pdf = new PrPdf('PAYSLIP');
-    $pdf->heading('PAYSLIP');
-    $pdf->meta('Site', $site_name);
-    $pdf->meta('Week', prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']));
-    $pdf->meta('Payroll ID', $payroll['id']);
-    $pdf->meta('Worker', (string)($entry['name'] ?? ''));
-    $pdf->meta('Position', (string)($entry['position'] ?? ''));
-    $pdf->meta('Rate / Day', prMoney($entry['rate'] ?? 0));
-
-    $pdf->spacer(6);
-    $pdf->subheading('Earnings');
-    $rows = [
-        ['Days Worked', number_format((float)$entry['days_worked'], 1)],
-        ['Basic Pay (rate x days)', prMoney($entry['basic'])],
-        ['OT Hours (prev week)', number_format((float)$entry['ot_hours'], 1) . ' hrs'],
-        ['OT Rate', prMoney($entry['ot_rate'])],
-        ['OT Pay', prMoney($entry['ot_pay'])],
-        ['Flat Pay', prMoney($entry['flat_pay'])],
-        ['GROSS', prMoney($entry['gross'])],
-    ];
-    $pdf->table(['Item', 'Amount'], $rows, [280, 130], [1]);
-
-    $pdf->spacer(6);
-    $pdf->subheading('Deductions');
-    $rows2 = [
-        ['Per. Cash Adv. (CA KANG ENGR)', prMoney($entry['personal_cash_advance'])],
-        ['Cash Adv.', prMoney($entry['cash_advance'])],
-        ['Deduction', prMoney($entry['deduction'])],
-    ];
-    $pdf->table(['Item', 'Amount'], $rows2, [280, 130], [1]);
-
-    $pdf->spacer(8);
-    $pdf->subheading('NET PAY');
-    $pdf->table(['Item', 'Amount'], [['NET PAY', prMoney($entry['net'])]], [280, 130], [1]);
-
-    $att = str_split(prNormAtt($entry['attendance'] ?? ''));
-    $otd = prOtDailyArray($entry['ot_daily'] ?? '');
-    $pdf->spacer(6);
-    $pdf->subheading('Attendance (Sun Mon Tue Wed Thu Fri Sat)');
-    $pdf->paragraph(implode('   ', array_slice($att, 0, 7)) . '   |   OT/hrs per day: ' . implode(' / ', $otd));
-
-    $pdf->spacer(12);
-    $pdf->paragraph('Prepared by: ____________________     Received by: ____________________', 8.5);
-    return $pdf->finish();
+    return prPdfPaySlips($payroll, [$entry], $site_name);
 }
