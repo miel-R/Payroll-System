@@ -170,6 +170,27 @@
                 setTimeout(function () { window.location.href = data.data.url; }, 900);
                 return;
             }
+            if (data.render === 'pdf' && data.data && data.data.pdf) {
+                if (data.msg) PAYROLL.toast(data.type || 'success', data.msg);
+                try {
+                    const b64 = data.data.pdf;
+                    const arr = Uint8Array.from(atob(b64), function (c) { return c.charCodeAt(0); });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(new Blob([arr], { type: 'application/pdf' }));
+                    link.download = data.data.filename || 'backup.pdf';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    setTimeout(function () { URL.revokeObjectURL(link.href); }, 3000);
+                } catch (e) {
+                    PAYROLL.toast('danger', 'Backup PDF could not be downloaded.');
+                }
+                setTimeout(function () {
+                    if (data.data.url) { window.location.href = data.data.url; }
+                    else { window.location.reload(); }
+                }, 1400);
+                return;
+            }
             if (data.ok) {
                 if (data.msg) PAYROLL.toast(data.type || 'success', data.msg);
                 if (data.render === 'refresh') {
@@ -536,22 +557,27 @@
     }
 
     /* ===== Table filters (Payroll hub history tables) ===== */
+    function applyFilter(sel) {
+        const table = document.getElementById(sel.getAttribute('data-filter-table'));
+        if (!table) return;
+        const key = sel.getAttribute('data-filter-key') || '';
+        const value = sel.value;
+        let visible = 0;
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            if (row.hasAttribute('data-filter-empty')) return;
+            const show = key === '' || value === '' || row.getAttribute('data-' + key) === value;
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        const empty = table.querySelector('tr[data-filter-empty]');
+        if (empty) empty.style.display = visible ? 'none' : '';
+    }
+
     function bindTableFilters() {
         document.querySelectorAll('select.js-table-filter').forEach(function (sel) {
-            const key = sel.getAttribute('data-filter-key') || '';
+            applyFilter(sel);
             sel.addEventListener('change', function () {
-                const table = document.getElementById(sel.getAttribute('data-filter-table'));
-                if (!table) return;
-                const value = sel.value;
-                let visible = 0;
-                table.querySelectorAll('tbody tr').forEach(function (row) {
-                    if (row.hasAttribute('data-filter-empty')) return;
-                    const show = key === '' || value === '' || row.getAttribute('data-' + key) === value;
-                    row.style.display = show ? '' : 'none';
-                    if (show) visible++;
-                });
-                const empty = table.querySelector('tr[data-filter-empty]');
-                if (empty) empty.style.display = visible ? 'none' : '';
+                applyFilter(sel);
             });
         });
     }

@@ -14,6 +14,7 @@
 // through htmlspecialchars() when embedding it in HTML for the no-JS path.
 
 require_once __DIR__ . '/DBpayroll.php';
+require_once __DIR__ . '/PDF.php';
 
 function act_ok($type, $msg, $render = null, $data = []) {
     return ['ok' => true, 'type' => $type, 'msg' => $msg, 'render' => $render, 'data' => $data];
@@ -149,11 +150,45 @@ function act_site_update($ctx) {
 
 function act_site_delete($ctx) {
     $id = (int)($ctx['post']['id'] ?? 0);
-    if ($id > 0) {
-        dbDeleteSite($id);
-        return act_ok('success', 'Site deleted.', 'refresh');
+    if ($id <= 0) {
+        return act_fail('danger', 'No site selected.');
     }
-    return act_fail('danger', 'No site selected.');
+    $site = dbGetSite($id);
+    if (!$site) {
+        return act_fail('danger', 'Site not found.');
+    }
+
+    // Build a full PDF backup BEFORE deleting anything.
+    $workers = dbGetSiteEmployees($id);
+    $payrolls = dbGetPayrolls($id);
+    $entriesById = [];
+    foreach ($payrolls as $p) {
+        $entriesById[(int)$p['id']] = prWithCalc(dbGetPayrollEntries((int)$p['id']));
+    }
+    $advances = dbFetchAll(
+        "SELECT pca.id, pca.amount, pca.advance_date, pca.note,
+            se.id AS site_employee_id, e.name AS worker_name
+         FROM personal_cash_advances pca
+         JOIN site_employees se ON se.id = pca.site_employee_id
+         JOIN employees e ON e.id = se.employee_id
+         WHERE se.site_id = :sid
+         ORDER BY pca.advance_date DESC",
+        [':sid' => $id]
+    ) ?: [];
+    foreach ($advances as &$a) {
+        $a['balance'] = dbPersonalCaBalance((int)$a['site_employee_id']);
+    }
+    unset($a);
+
+    $bytes = prPdfSiteBackup($site, $workers, $payrolls, $entriesById, $advances);
+    dbDeleteSite($id);
+
+    $name = preg_replace('/[^A-Za-z0-9_-]+/', '-', $site['name'] ?? '') ?: 'site';
+    return act_ok('success', 'Site deleted. Full backup downloaded as PDF.', 'pdf', [
+        'pdf'      => base64_encode($bytes),
+        'filename' => 'site-backup-' . $name . '-' . date('Y-m-d') . '.pdf',
+        'url'      => '',
+    ]);
 }
 
 function act_worker_add($ctx) {
@@ -259,11 +294,27 @@ function act_payroll_add($ctx) {
 
 function act_payroll_delete($ctx) {
     $id = (int)($ctx['post']['id'] ?? 0);
-    if ($id > 0) {
-        dbDeletePayroll($id);
-        return act_ok('success', 'Payroll week deleted.', 'refresh');
+    if ($id <= 0) {
+        return act_fail('danger', 'No payroll selected.');
     }
-    return act_fail('danger', 'No payroll selected.');
+    $payroll = dbGetPayroll($id);
+    if (!$payroll) {
+        return act_fail('danger', 'Payroll not found.');
+    }
+
+    // Build a full PDF backup BEFORE deleting the week.
+    $site = dbGetSite((int)$payroll['site_id']);
+    $site_name = $site ? (string)$site['name'] : ('Site ' . (int)$payroll['site_id']);
+    $entries = prWithCalc(dbGetPayrollEntries($id));
+    $bytes = prPdfPayrollBackup($payroll, $entries, $site_name);
+    dbDeletePayroll($id);
+
+    $name = preg_replace('/[^A-Za-z0-9_-]+/', '-', $site_name) ?: 'payroll';
+    return act_ok('success', 'Payroll week deleted. Backup downloaded as PDF.', 'pdf', [
+        'pdf'      => base64_encode($bytes),
+        'filename' => 'payroll-backup-' . $name . '-' . $payroll['week_start'] . '.pdf',
+        'url'      => '',
+    ]);
 }
 
 function act_payroll_save($ctx) {

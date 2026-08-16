@@ -26,6 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($res['msg'] !== '') {
         $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
     }
+    if ($res['render'] === 'pdf' && !empty($res['data']['pdf'])) {
+        echo '<script>'
+            . 'var b=' . json_encode($res['data']['pdf']) . ';'
+            . 'var a=document.createElement("a");'
+            . 'a.href=URL.createObjectURL(new Blob([Uint8Array.from(atob(b),function(c){return c.charCodeAt(0);})],{type:"application/pdf"}));'
+            . 'a.download=' . json_encode($res['data']['filename'] ?? 'backup.pdf') . ';'
+            . 'document.body.appendChild(a);a.click();'
+            . 'setTimeout(function(){window.location.reload();},1400);'
+            . '</script>';
+    }
 }
 
 

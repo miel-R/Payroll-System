@@ -52,6 +52,8 @@ $pca_week_pairs = [];
 foreach ($pca_recovery as $r) {
     $pca_week_pairs[(string)$r['week_start']] = (string)$r['week_end'];
 }
+$default_ca_week = $ca_week_pairs ? max(array_keys($ca_week_pairs)) : '';
+$default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
 ?>
 
 <div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -154,7 +156,7 @@ foreach ($pca_recovery as $r) {
                 data-filter-table="caHistoryTable" data-filter-key="week">
                 <option value="">All Weeks</option>
                 <?php foreach ($ca_week_pairs as $ws => $we): ?>
-                    <option value="<?php echo htmlspecialchars($ws); ?>">
+                    <option value="<?php echo htmlspecialchars($ws); ?>" <?php echo $ws === $default_ca_week ? 'selected' : ''; ?>>
                         <?php echo prDate($ws) . ' - ' . prDate($we); ?>
                     </option>
                 <?php endforeach; ?>
@@ -277,7 +279,7 @@ foreach ($pca_recovery as $r) {
                         data-filter-table="pcaRepaidTable" data-filter-key="week">
                         <option value="">All Weeks</option>
                         <?php foreach ($pca_week_pairs as $ws => $we): ?>
-                            <option value="<?php echo htmlspecialchars($ws); ?>">
+                            <option value="<?php echo htmlspecialchars($ws); ?>" <?php echo $ws === $default_pca_week ? 'selected' : ''; ?>>
                                 <?php echo prDate($ws) . ' - ' . prDate($we); ?>
                             </option>
                         <?php endforeach; ?>
