@@ -6,10 +6,22 @@
 
 $page_title = 'Daily Time Record';
 $active_page = 'dtr';
+
+// Canonicalize a missing/invalid date before any output so the API can
+// read site_id + date from the URL query string (ajax.php:52-54).
+$site_id = (int)($_GET['site_id'] ?? 0);
+$date = (string)($_GET['date'] ?? '');
+if ($site_id > 0 && ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date))) {
+    $date = date('Y-m-d');
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+        header('Location: dtr.php?site_id=' . $site_id . '&date=' . $date);
+        exit();
+    }
+}
+
 require_once __DIR__ . '/inc/header.php';
 require_once __DIR__ . '/config/actions.php';
 
-$site_id = (int)($_GET['site_id'] ?? 0);
 $flash = [];
 
 try {
@@ -65,13 +77,6 @@ if (!$site) {
 }
 
 $date = (string)($_GET['date'] ?? '');
-if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-    $date = date('Y-m-d');
-    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
-        header('Location: dtr.php?site_id=' . (int)$site_id . '&date=' . $date);
-        exit();
-    }
-}
 
 // Week (Sun..Sat) that contains the selected date.
 $ts = strtotime($date);
