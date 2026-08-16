@@ -20,6 +20,7 @@ $files = [
     'sites.php',
     'site_workers.php',
     'payrolls.php',
+    'payroll.php',
     'payroll_form.php',
     'payroll_view.php',
     'dtr.php',

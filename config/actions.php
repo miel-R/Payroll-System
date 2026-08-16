@@ -197,13 +197,16 @@ function act_worker_delete($ctx) {
 }
 
 function act_payroll_add($ctx) {
-    $site_id = (int)($ctx['site_id'] ?? 0);
+    $site_id = (int)($ctx['site_id'] ?? ($ctx['post']['site_id'] ?? 0));
     $week_start = trim((string)($ctx['post']['week_start'] ?? ''));
     $week_end = trim((string)($ctx['post']['week_end'] ?? ''));
     $budget = (float)($ctx['post']['budget'] ?? 0);
     $site_deduction = (float)($ctx['post']['site_deduction'] ?? 0);
     $add_expenses = (float)($ctx['post']['add_expenses'] ?? 0);
 
+    if ($site_id <= 0) {
+        return act_fail('danger', 'No site selected.');
+    }
     if ($week_start === '' || $week_end === '') {
         return act_fail('danger', 'Week start and end dates are required.');
     }
@@ -213,8 +216,45 @@ function act_payroll_add($ctx) {
     if (dbGetPayrollByWeek($site_id, $week_start, $week_end)) {
         return act_fail('warning', 'A payroll already exists for this week.');
     }
-    dbAddPayroll($site_id, $week_start, $week_end, $budget, $site_deduction, $add_expenses);
-    return act_ok('success', 'Payroll week added. Now add the per-worker entries.', 'refresh');
+
+    // Guard 1: the previous payroll week must have been saved (has entries),
+    // otherwise the chain of OT/entries is incomplete.
+    $prev = dbLatestPayrollForSite($site_id);
+    if ($prev && strtotime($prev['week_end']) < strtotime($week_start)) {
+        $prev_entries = count(dbGetPayrollEntries((int)$prev['id']));
+        if ($prev_entries === 0) {
+            return act_fail(
+                'danger',
+                'The previous payroll week (' . prDate($prev['week_start']) . ' - ' . prDate($prev['week_end'])
+                . ') has no saved entries yet. Open Edit / Save Entries and save it before adding a new week.'
+            );
+        }
+    }
+
+    // Guard 2: a week that has begun (past or current) must have some saved
+    // DTR attendance, otherwise the payroll would be based on nothing.
+    if (strtotime($week_start) <= strtotime(date('Y-m-d'))) {
+        $att_count = dbWeekAttendanceCount($site_id, $week_start, $week_end);
+        if ($att_count === 0) {
+            return act_fail(
+                'danger',
+                'No DTR attendance has been saved for this week yet ('
+                . prDate($week_start) . ' - ' . prDate($week_end)
+                . '). Enter and save attendance in the DTR before creating this payroll week.'
+            );
+        }
+    }
+
+    $payroll_id = dbAddPayroll($site_id, $week_start, $week_end, $budget, $site_deduction, $add_expenses);
+    if (!$payroll_id) {
+        return act_fail('danger', 'Could not create the payroll week.');
+    }
+    return act_ok(
+        'success',
+        'Payroll week added. Now enter the per-worker entries (incl. cash advance and personal cash advance).',
+        'redirect',
+        ['url' => 'payroll_form.php?payroll_id=' . (int)$payroll_id]
+    );
 }
 
 function act_payroll_delete($ctx) {

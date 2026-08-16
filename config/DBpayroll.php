@@ -739,3 +739,131 @@ function dbWeekAttendanceByWorker($site_id, $week_start, $week_end) {
     unset($m);
     return $map;
 }
+
+// ============================================================
+// PAYROLL HUB (payroll.php): site summary + advance history
+// ============================================================
+
+/**
+ * All sites with worker/payroll counts plus their most recent payroll week
+ * (id, range, budget, payroll total, saved-entry count). Used by the Payroll
+ * hub site boxes.
+ */
+function dbSitesWithLatestPayroll() {
+    return dbFetchAll(
+        "SELECT s.*,
+            (SELECT COUNT(*) FROM site_employees se WHERE se.site_id = s.id) AS worker_count,
+            (SELECT COUNT(*) FROM payrolls p WHERE p.site_id = s.id) AS payroll_count,
+            lp.id AS latest_payroll_id,
+            lp.week_start AS latest_week_start,
+            lp.week_end AS latest_week_end,
+            lp.budget AS latest_budget,
+            COALESCE((
+                SELECT ROUND(SUM(
+                    CASE WHEN le.flat_pay > 0 THEN le.flat_pay
+                         ELSE COALESCE(NULLIF(le.rate, 0), lse.rate) * le.days_worked
+                              + (COALESCE(NULLIF(le.rate, 0), lse.rate) / 8) * le.ot_hours
+                    END), 2)
+                FROM payroll_entries le
+                JOIN site_employees lse ON lse.id = le.site_employee_id
+                WHERE le.payroll_id = lp.id
+            ), 0) AS latest_total,
+            (SELECT COUNT(*) FROM payroll_entries le2 WHERE le2.payroll_id = lp.id) AS latest_entries
+         FROM sites s
+         LEFT JOIN payrolls lp ON lp.id = (
+             SELECT p2.id FROM payrolls p2
+             WHERE p2.site_id = s.id
+             ORDER BY p2.week_start DESC LIMIT 1
+         )
+         ORDER BY s.name ASC"
+    ) ?: [];
+}
+
+/**
+ * Regular weekly cash advances recovered per worker per week
+ * (payroll_entries.cash_advance > 0), for the Payroll hub history.
+ */
+function dbCashAdvanceHistory() {
+    return dbFetchAll(
+        "SELECT pe.cash_advance, p.id AS payroll_id, p.week_start, p.week_end,
+            s.id AS site_id, s.name AS site_name,
+            se.id AS site_employee_id, e.name AS worker_name, e.id AS employee_id
+         FROM payroll_entries pe
+         JOIN payrolls p ON p.id = pe.payroll_id
+         JOIN site_employees se ON se.id = pe.site_employee_id
+         JOIN employees e ON e.id = se.employee_id
+         JOIN sites s ON s.id = p.site_id
+         WHERE pe.cash_advance > 0
+         ORDER BY p.week_start DESC, s.name ASC, e.name ASC"
+    ) ?: [];
+}
+
+/**
+ * Personal cash advance ledger (advances given) for every worker, including
+ * each worker's running balance = given - recovered. Sorted newest first.
+ */
+function dbPersonalCaHistoryAll() {
+    $rows = dbFetchAll(
+        "SELECT pca.id, pca.amount, pca.advance_date, pca.note, pca.created_at,
+            se.id AS site_employee_id, e.name AS worker_name, e.id AS employee_id,
+            s.id AS site_id, s.name AS site_name
+         FROM personal_cash_advances pca
+         JOIN site_employees se ON se.id = pca.site_employee_id
+         JOIN employees e ON e.id = se.employee_id
+         JOIN sites s ON s.id = se.site_id
+         ORDER BY pca.advance_date DESC, pca.id DESC"
+    ) ?: [];
+
+    $balances = [];
+    foreach (array_unique(array_column($rows, 'site_employee_id')) as $se) {
+        $balances[(int)$se] = dbPersonalCaBalance((int)$se);
+    }
+    foreach ($rows as &$r) {
+        $r['balance'] = $balances[(int)$r['site_employee_id']];
+    }
+    unset($r);
+    return $rows;
+}
+
+/**
+ * Weeks where a worker actually repaid personal cash advance
+ * (payroll_entries.personal_cash_advance > 0), for the Payroll hub history.
+ */
+function dbPersonalCaRecoveryHistory() {
+    return dbFetchAll(
+        "SELECT pe.personal_cash_advance AS recovered, p.id AS payroll_id,
+            p.week_start, p.week_end,
+            s.id AS site_id, s.name AS site_name,
+            se.id AS site_employee_id, e.name AS worker_name, e.id AS employee_id
+         FROM payroll_entries pe
+         JOIN payrolls p ON p.id = pe.payroll_id
+         JOIN site_employees se ON se.id = pe.site_employee_id
+         JOIN employees e ON e.id = se.employee_id
+         JOIN sites s ON s.id = p.site_id
+         WHERE pe.personal_cash_advance > 0
+         ORDER BY p.week_start DESC, s.name ASC, e.name ASC"
+    ) ?: [];
+}
+
+/**
+ * Total DTR attendance rows saved for a site within a week (any day has data).
+ */
+function dbWeekAttendanceCount($site_id, $week_start, $week_end) {
+    return (int)dbFetchColumn(
+        "SELECT COUNT(*) FROM attendance a
+         JOIN site_employees se ON se.id = a.site_employee_id
+         WHERE se.site_id = :site_id AND a.work_date BETWEEN :ws AND :we",
+        [':site_id' => (int)$site_id, ':ws' => $week_start, ':we' => $week_end]
+    );
+}
+
+/**
+ * The most recent payroll week for a site (or null).
+ */
+function dbLatestPayrollForSite($site_id) {
+    return dbFetchOne(
+        "SELECT * FROM payrolls WHERE site_id = :site_id
+         ORDER BY week_start DESC LIMIT 1",
+        [':site_id' => (int)$site_id]
+    );
+}

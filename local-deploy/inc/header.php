@@ -49,6 +49,7 @@ function csrf_field() {
 $app_nav = [
     ['dashboard', 'Dashboard', 'bi-speedometer2', 'dashboard.php'],
     ['sites', 'Sites', 'bi-geo-alt', 'sites.php'],
+    ['payroll', 'Payroll', 'bi-cash-stack', 'payroll.php'],
     ['dtr', 'DTR', 'bi-clipboard-check', 'dtr.php'],
 ];
 if (currentUserRole() === 'admin') {

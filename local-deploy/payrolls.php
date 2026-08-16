@@ -29,10 +29,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'post'     => $_POST,
         'is_admin' => $is_admin,
         'user_id'  => (int)($_SESSION['user_id'] ?? 0),
-        'site_id'  => $site_id,
+        'site_id'  => (int)($_POST['site_id'] ?? $site_id),
     ]);
     if ($res['msg'] !== '') {
         $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
+    }
+    if ($res['render'] === 'redirect' && !empty($res['data']['url'])) {
+        echo '<script>setTimeout(function(){window.location.replace(' . json_encode($res['data']['url']) . ');}, 800);</script>';
     }
 }
 

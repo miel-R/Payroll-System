@@ -177,6 +177,7 @@ $totals = prPayrollTotals($entries, $payroll);
                     $pca = $e ? (float)$e['personal_cash_advance'] : 0;
                     $ded = $e ? (float)$e['deduction'] : 0;
                     $flat = $e ? (float)$e['flat_pay'] : 0;
+                    $pca_balance = dbPersonalCaBalance($k);
                 ?>
                     <div class="col-md-6 col-xl-4">
                         <div class="worker-card border rounded p-3 h-100"
@@ -238,6 +239,16 @@ $totals = prPayrollTotals($entries, $payroll);
                                     <label class="form-label small mb-0">Per. Cash Adv.</label>
                                     <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end in-pca"
                                         name="pca_<?php echo $k; ?>" value="<?php echo $pca; ?>">
+                                    <?php if ($pca_balance > 0): ?>
+                                        <div class="small text-muted mt-1">Outstanding: <?php echo prMoney($pca_balance); ?></div>
+                                        <div class="form-check form-switch mt-1">
+                                            <input class="form-check-input pca-skip" type="checkbox" id="pcaSkip<?php echo $k; ?>"
+                                                <?php echo $pca == 0 ? 'checked' : ''; ?>>
+                                            <label class="form-check-label small" for="pcaSkip<?php echo $k; ?>">Skip this week</label>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="small text-muted mt-1">No outstanding personal CA.</div>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-0">Deduction</label>

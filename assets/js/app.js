@@ -165,6 +165,11 @@
             if (data.render === 'dtr_day' && data.data) {
                 PAYROLL.renderDtr(data.data);
             }
+            if (data.render === 'redirect' && data.data && data.data.url) {
+                if (data.msg) PAYROLL.toast(data.type || 'success', data.msg);
+                setTimeout(function () { window.location.href = data.data.url; }, 900);
+                return;
+            }
             if (data.ok) {
                 if (data.msg) PAYROLL.toast(data.type || 'success', data.msg);
                 if (data.render === 'refresh') {
@@ -410,7 +415,27 @@
         cards.forEach(function (card) {
             if (card.dataset.calcBound) return;
             card.dataset.calcBound = '1';
+            const pcaInput = card.querySelector('.in-pca');
+            const skip = card.querySelector('.pca-skip');
+            if (skip && pcaInput) {
+                skip.addEventListener('change', function () {
+                    if (skip.checked) {
+                        pcaInput.dataset.prev = pcaInput.value;
+                        pcaInput.value = 0;
+                        pcaInput.disabled = true;
+                    } else {
+                        pcaInput.disabled = false;
+                        if (pcaInput.dataset.prev) pcaInput.value = pcaInput.dataset.prev;
+                    }
+                    calcAll();
+                });
+                if (skip.checked) {
+                    pcaInput.value = 0;
+                    pcaInput.disabled = true;
+                }
+            }
             card.querySelectorAll('input, select').forEach(function (inp) {
+                if (inp === skip) return;
                 inp.addEventListener('input', calcAll);
                 inp.addEventListener('change', calcAll);
             });
