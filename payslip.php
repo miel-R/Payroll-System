@@ -1,4 +1,5 @@
 <?php
+ob_start(); // capture any stray output so the PDF download below can always serve clean bytes + headers
 // E:\PAYROLL\payslip.php
 // Pick a site + payroll week, then choose scope:
 //   Per Person ........ one worker's compact payslip stub (print / PDF)
