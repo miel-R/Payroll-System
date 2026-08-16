@@ -45,9 +45,15 @@ if (!empty($_GET['download']) && $site_id > 0 && $payroll_id > 0) {
                 $bytes = prPdfPaySlip($dl_payroll, $dl_entry, (string)$dl_site['name']);
                 $name = preg_replace('/[^A-Za-z0-9_-]+/', '-', $dl_entry['name']) ?: 'worker';
             }
+            // Discard any stray buffered output so the binary becomes corrupted (blank), then serve fresh.
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
             header('Content-Type: application/pdf');
             header('Content-Disposition: attachment; filename="payslips-' . $name . '-' . $dl_payroll['week_start'] . '.pdf"');
             header('Content-Length: ' . strlen($bytes));
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
             echo $bytes;
             exit();
         }
