@@ -43,15 +43,6 @@ if ($tables_ok) {
     <a href="sites.php" class="btn btn-primary"><i class="bi bi-geo-alt"></i> Manage Sites</a>
 </div>
 
-<?php if (!$tables_ok): ?>
-    <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle"></i>
-        The payroll tables have not been created yet. If you just set up this system,
-        run <a href="import_seed.php" class="alert-link">Import Seed Data</a> to create the tables
-        and load the sample payrolls.
-    </div>
-<?php endif; ?>
-
 <div class="row">
     <div class="col-6 col-lg-3">
         <div class="stat-card" style="background: linear-gradient(135deg,#667eea,#764ba2);">
@@ -88,8 +79,6 @@ if ($tables_ok) {
     <?php if (!$sites): ?>
         <p class="text-muted mb-0">
             No sites yet. <a href="sites.php">Add a site</a> to get started.
-            If you just set up the database, run
-            <a href="import_seed.php">Import Seed Data</a> to load the sample payrolls.
         </p>
     <?php else: ?>
         <div class="table-responsive">

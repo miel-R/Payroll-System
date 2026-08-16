@@ -37,7 +37,7 @@ try {
     $ca_history = [];
     $pca_ledger = [];
     $pca_recovery = [];
-    $flash[] = ['danger', 'Database tables are missing. Run <a href="import_seed.php" class="alert-link">Import Seed Data</a> first.'];
+    $flash[] = ['danger', 'Could not load payroll data. Check the database connection and try again.'];
 }
 
 $today = date('Y-m-d');
@@ -64,8 +64,6 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
     <?php if (!$sites): ?>
         <p class="text-muted mb-0">
             No sites yet. <a href="sites.php">Add a site</a> to get started.
-            If you just set up the database, run
-            <a href="import_seed.php">Import Seed Data</a> to load the sample payrolls.
         </p>
     <?php else: ?>
         <div class="row">

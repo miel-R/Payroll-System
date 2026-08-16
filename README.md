@@ -55,9 +55,7 @@ guide; it is regenerated from the main app by `tools/build_local_deploy.php`
 
 3. Copy the project into `C:\xampp\htdocs\payroll` (or point Apache at it) and
    open `http://localhost/payroll/`.
-4. Log in — the app creates tables it needs on first load, but to load the
-   sample data go to `http://localhost/payroll/import_seed.php` and click
-   **Import Seed Data** (this wipes payroll data first, so run it once).
+4. Log in — the app creates the tables it needs on its first page load.
 5. Create accounts at `http://localhost/payroll/users.php`.
 
 Database credentials are resolved in this order (`config/DBconnect.php`):
@@ -181,8 +179,7 @@ assets/css/app.css      design system (light/dark theme)
 assets/js/app.js        AJAX forms, toasts, confirm modal, DTR shortcuts
 api/index.php           Vercel front controller
 database/schema.sql     full SQL schema
-data/payroll_seed.json  seed data parsed from the spreadsheet
-tools/                  xlsx -> json parser, DTR test filler
+tools/                  DTR test filler
 ```
 
 ## Payroll math

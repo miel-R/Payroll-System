@@ -6,8 +6,7 @@ Conventions for the PHP Payroll System in this repo.
 
 - `index.php` - login page (public)
 - `dashboard.php`, `sites.php`, `site_workers.php`, `payrolls.php`,
-  `payroll_form.php`, `payroll_view.php`, `dtr.php`, `users.php` - authenticated pages
-- `import_seed.php` - dev tool that creates tables + loads seed data
+  `payroll.php`, `payroll_form.php`, `payroll_view.php`, `dtr.php`, `users.php` - authenticated pages
 - `dtr.php` - daily time record: pick a site + day, mark each worker P/A/H
   and their OT hours. Payroll days and paid OT are derived from these rows.
 - `logout.php`, `create_user.php`, `test_db.php` - auth/utility pages
@@ -57,8 +56,8 @@ Conventions for the PHP Payroll System in this repo.
 - Use the helper functions, never raw PDO where a helper exists.
 - All user output goes through `htmlspecialchars()`. Escape everything.
 - Money is stored as DECIMAL and formatted with `prMoney()` (2 decimals).
-- Pages that hit tables must tolerate a fresh DB: wrap initial loads in
-  `try/catch (PDOException)` so users can reach `import_seed.php` first.
+- Pages that hit tables must tolerate an unavailable DB: wrap initial loads in
+  `try/catch (PDOException)` so pages render (with a warning) instead of white-screening.
 
 ## Roles
 
@@ -111,17 +110,8 @@ Conventions for the PHP Payroll System in this repo.
   (copies position/rate), creates the target site's payroll week if missing,
   and adds a blank entry so their days can be entered there.
 
-## Seed data
+## Dev tools
 
-- `tools/xlsx_to_json.py` parses `GENERAL PAYROLL.xlsx` into
-  `data/payroll_seed.json` (stdlib only, no dependencies).
-  Run: `python tools/xlsx_to_json.py "C:/path/GENERAL PAYROLL.xlsx"`
-- The summary labels sit at col 8/9 for ANGELES blocks and col 9/10 for LUBAO
-  blocks in some sheets, so summary detection scans the full row.
-- Attendance is stored as a 7-char `S M T W T F S` code: digit = present,
-  `O` = absent, `H` = half day, `.` = no data.
-- Load the JSON via `import_seed.php` (authenticated, wipes payroll data).
-  Delete `import_seed.php` from the server after importing.
 - `tools/fill_test_dtr.php` (CLI, one-time) fills DTR attendance (prev week full
   + current week up to today, `P` with sample OT) for ALL workers on ALL sites
   so the DTR/payroll screens can be tested. `--local` targets the local wip0 DB,

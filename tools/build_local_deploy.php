@@ -27,7 +27,6 @@ $files = [
     'users.php',
     'logout.php',
     'contact.php',
-    'import_seed.php',
     'create_user.php',
     'ajax.php',
     // Config
@@ -44,9 +43,8 @@ $files = [
     'assets/css/app.css',
     'assets/css/index_style.css',
     'assets/js/app.js',
-    // Schema + seed
+    // Schema
     'database/schema.sql',
-    'data/payroll_seed.json',
 ];
 
 $templates = [

@@ -65,7 +65,6 @@ $allowed = [
     'dtr.php',
     'users.php',
     'logout.php',
-    'import_seed.php',
     'contact.php',
     'ajax.php',
 ];

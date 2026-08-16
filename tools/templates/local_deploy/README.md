@@ -12,7 +12,7 @@ from the repo root to refresh it after code changes).
   created on page load).
 - `config/db_credentials.php.example` — copy to `config/db_credentials.php` on
   shared hosts (the real file is never committed).
-- `.htaccess` — blocks direct web access to `config/`, `database/`, `data/`,
+- `.htaccess` — blocks direct web access to `config/`, `database/`,
   and `.log` files.
 - **Not included:** `api/`, `vercel.json`, `tools/` and other Vercel/dev-only
   files. This copy uses plain PHP pages served directly by Apache.
@@ -38,9 +38,7 @@ from the repo root to refresh it after code changes).
    `http://localhost/payroll/create_user.php` to create the initial
    `admin` account (default password `admin123`), then log in and **change the
    password immediately** under **Manage Users**.
-5. Optional — load the sample payroll data:
-   `http://localhost/payroll/import_seed.php` → **Import Seed Data**.
-6. **Delete `create_user.php` and `import_seed.php` after first use.**
+5. **Delete `create_user.php` after first use.**
 
 ## Option B — Shared host (InfinityFree, cPanel, etc.)
 
@@ -63,9 +61,7 @@ from the repo root to refresh it after code changes).
 4. Visit your site URL. First time only, open `/create_user.php` to create the
    initial `admin` account, then log in and **change the password** under
    **Manage Users**.
-5. Optional — load the sample data via `/import_seed.php`.
-6. **Delete `create_user.php` and `import_seed.php` from the server after
-   first use.**
+5. **Delete `create_user.php` from the server after first use.**
 
 ## Database credentials resolution
 

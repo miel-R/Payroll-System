@@ -3,7 +3,6 @@
 
 RedirectMatch 403 ^/config/
 RedirectMatch 403 ^/database/
-RedirectMatch 403 ^/data/
 
 <FilesMatch "\.(log|sql)$">
     Require all denied

@@ -33,7 +33,7 @@ try {
     $sites = dbGetSites();
 } catch (PDOException $e) {
     $sites = [];
-    $flash[] = ['danger', 'Database tables are missing. Run <a href="import_seed.php" class="alert-link">Import Seed Data</a> first.'];
+    $flash[] = ['danger', 'Could not load sites. Check the database connection and try again.'];
 }
 ?>
 
@@ -61,8 +61,6 @@ try {
     <?php if (!$sites): ?>
         <p class="text-muted mb-0">
             No sites yet. Add a site to get started.
-            If you just set up the database, run
-            <a href="import_seed.php">Import Seed Data</a> to load the sample payrolls.
         </p>
     <?php else: ?>
         <div class="table-responsive d-none d-lg-block">
