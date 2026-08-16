@@ -389,7 +389,7 @@ function prPdfSiteBackup($site, $workers, $payrolls, $payrollEntriesById, $advan
  * Draw one payslip as a compact aligned table (half page width).
  * Fits 10 per bond page (2 columns x 5 rows) with $h = 125, $gap 10.
  */
-function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $prevEnd) {
+function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $prevEnd, $wk_otd, $lag_ot) {
     $pad = 8;
     $x1 = $x + $pad;
     $xr = $x + $w - $pad;
@@ -405,16 +405,20 @@ function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $pr
     $pdf->box($x, $top - 12.5, $w, 0.6);
 
     // Worker + rate / days / OT
+    $otFmt = function ($v) {
+        return $v == round($v) ? (string)(int)$v : sprintf('%g', $v);
+    };
     $pdf->textAt($x1, $top - 21, 8, 'B', 'Worker: ' . (string)$e['name']);
     $pdf->textAt($x1, $top - 30, $size, 'N',
         'Rate: ' . prMoney($e['rate'])
         . '   Days: ' . number_format((float)$e['days_worked'], 1)
-        . '   OT: ' . number_format((float)$e['ot_hours'], 1));
+        . '   OT (last wk): ' . number_format((float)$e['ot_hours'], 1)
+        . '   Lag OT: ' . $otFmt((float)$lag_ot));
     $pdf->box($x, $top - 34, $w, 0.6);
 
-    // Attendance grid: 7 columns (S M T W T F S) x (label / code / prev-week OT, Sat=0)
+    // Attendance grid: 7 columns (S M T W T F S) x (label / code / THIS-week OT, Sat=0)
     $codes = prNormAtt($e['attendance'] ?? '');
-    $otd = prOtDailyArray($e['ot_daily'] ?? '');
+    $otd = $wk_otd;
     $otd[6] = 0.0;
     $colw = $cw / 7;
     $gTop = $top - 36;
@@ -435,17 +439,17 @@ function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $pr
 
     // Note under grid
     $pdf->textAt($x1, $top - 64, 5.5, 'N',
-        'P present / A absent / H half-day.  Sat OT always 0 here - recorded Sat OT pays next wk.');
+        'P present / A absent / H half-day.  OT below = this week DTR.  Sat OT 0 here - paid next wk as Lag OT.');
 
-    // Money grid: 2 aligned columns, values right-aligned
+    // Money grid: Basic | OT Pay, GROSS, then a full-width Deduct line
+    // (net = gross - cash adv - per. ca, so the Deduct total reconciles to NET)
+    $deductTotal = round((float)$e['cash_advance'] + (float)$e['personal_cash_advance'], 2);
     $money = [
         ['Basic', prMoney($e['basic']), 'OT Pay', prMoney($e['ot_pay'])],
-        ['Flat', prMoney($e['flat_pay']), 'GROSS', prMoney($e['gross'])],
-        ['Per. Cash Adv', prMoney($e['personal_cash_advance']), 'Cash Adv', prMoney($e['cash_advance'])],
-        ['Deduction', prMoney($e['deduction']), '', ''],
+        ['GROSS', prMoney($e['gross']), '', ''],
     ];
     foreach ($money as $i => $row) {
-        $by = $top - 74 - $i * 8;
+        $by = $top - 74 - $i * 9;
         list($la, $va, $lb, $vb) = $row;
         $pdf->textAt($x1, $by, $size, 'N', (string)$la . ':');
         if ($va !== '') {
@@ -457,7 +461,13 @@ function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $pr
         }
         $pdf->box($x, $by - 4.5, $w, 0.6);
     }
-    $pdf->box($mid, $top - 78.5, 0.6, 32);
+    $by = $top - 74 - 18;
+    $dedStr = 'Deduct: Cash Adv ' . prMoney($e['cash_advance'])
+        . ' + Per. CA ' . prMoney($e['personal_cash_advance'])
+        . ' = ' . prMoney($deductTotal);
+    $pdf->textAt($x1, $by, $size, 'N', $dedStr);
+    $pdf->box($x, $by - 4.5, $w, 0.6);
+    $pdf->box($mid, $top - 78.5, 0.6, 18);
 
     // NET PAY row
     $netY = $top - 108;
@@ -488,6 +498,12 @@ function prPdfPaySlips($payroll, $entries, $site_name) {
     $week = prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']);
     $prevEnd = prDate(date('Y-m-d', strtotime($payroll['week_start'] . ' -1 day')));
 
+    // This week's per-day OT (from the DTR/attendance table) for the S M T W T F S grid.
+    $wk_att = [];
+    if (function_exists('dbWeekAttendanceByWorker')) {
+        $wk_att = dbWeekAttendanceByWorker((int)$payroll['site_id'], $payroll['week_start'], $payroll['week_end']);
+    }
+
     $yTop = $pdf->getY();
     $i = 0;
     foreach ($entries as $e) {
@@ -499,7 +515,10 @@ function prPdfPaySlips($payroll, $entries, $site_name) {
         $rowIdx = intdiv($i, $cols) % $rows;
         $x = PrPdf::ML + $col * ($stubW + $gapCol);
         $top = $yTop - $rowIdx * ($stubH + $gapRow);
-        prPdfDrawPayslipStub($pdf, $e, $x, $top, $stubW, $stubH, $site_name, $week, $prevEnd);
+        $wk = $wk_att[(int)$e['site_employee_id']] ?? null;
+        $wk_otd = $wk ? prOtDailyArray($wk['ot_daily']) : [0, 0, 0, 0, 0, 0, 0];
+        $lag_ot = prOtDailyArray($e['ot_daily'] ?? '')[6];
+        prPdfDrawPayslipStub($pdf, $e, $x, $top, $stubW, $stubH, $site_name, $week, $prevEnd, $wk_otd, $lag_ot);
         $i++;
     }
 

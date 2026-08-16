@@ -47,13 +47,14 @@ if (!empty($_GET['download']) && $site_id > 0 && $payroll_id > 0) {
                 $bytes = prPdfPaySlip($dl_payroll, $dl_entry, (string)$dl_site['name']);
                 $name = preg_replace('/[^A-Za-z0-9_-]+/', '-', $dl_entry['name']) ?: 'worker';
             }
-            // Discard any stray buffered output so the binary becomes corrupted (blank), then serve fresh.
-            while (ob_get_level() > 0) {
-                ob_end_clean();
+            // Clear any stray output (keeping the runtime's own buffer stack intact)
+            // so the binary response is served clean on serverless platforms.
+            if (ob_get_level()) {
+                ob_clean();
             }
             header('Content-Type: application/pdf');
             header('Content-Disposition: attachment; filename="payslips-' . $name . '-' . $dl_payroll['week_start'] . '.pdf"');
-            header('Content-Length: ' . strlen($bytes));
+            header('Content-Encoding: identity');
             header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             header('Pragma: no-cache');
             echo $bytes;
@@ -74,6 +75,7 @@ $payrolls = [];
 $payroll = null;
 $entries = [];
 $entry = null;
+$wk_att = [];
 
 try {
     $sites = dbGetSites();
@@ -97,6 +99,7 @@ try {
             $payroll_id = 0;
         } else {
             $entries = prWithCalc(dbGetPayrollEntries($payroll_id));
+            $wk_att = dbWeekAttendanceByWorker($site_id, $payroll['week_start'], $payroll['week_end']);
             foreach ($entries as $e) {
                 if ((int)$e['site_employee_id'] === $worker_id) {
                     $entry = $e;
@@ -207,8 +210,10 @@ $prev_sat = $payroll ? prDate(date('Y-m-d', strtotime($payroll['week_start'] . '
         <div class="payslip-sheet">
             <?php foreach ($sheet_rows as $se):
                 $stub_codes = prNormAtt($se['attendance'] ?? '');
-                $stub_otd = prOtDailyArray($se['ot_daily'] ?? '');
+                $wk = $wk_att[$se['site_employee_id']] ?? null;
+                $stub_otd = $wk ? prOtDailyArray($wk['ot_daily']) : [0, 0, 0, 0, 0, 0, 0];
                 $stub_otd[6] = 0.0;
+                $lag_ot = prOtDailyArray($se['ot_daily'] ?? '')[6];
             ?>
                 <table class="payslip-stub">
                     <tr class="ps-head">
@@ -219,14 +224,14 @@ $prev_sat = $payroll ? prDate(date('Y-m-d', strtotime($payroll['week_start'] . '
                         <td colspan="7">Payroll Week: <?php echo prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']); ?></td>
                     </tr>
                     <tr class="ps-worker">
-                        <td colspan="5"><span class="ps-lbl">Worker:</span> <strong><?php echo htmlspecialchars($se['name']); ?></strong></td>
-                        <td colspan="2"><span class="ps-lbl">Position:</span> <?php echo htmlspecialchars($se['position'] ?: '-'); ?></td>
+                        <td colspan="7"><span class="ps-lbl">Worker:</span> <strong><?php echo htmlspecialchars($se['name']); ?></strong></td>
                     </tr>
                     <tr class="ps-meta">
                         <td><span class="ps-lbl">Rate/Day:</span> <?php echo prMoney($se['rate']); ?></td>
                         <td><span class="ps-lbl">Days:</span> <?php echo number_format((float)$se['days_worked'], 1); ?></td>
-                        <td colspan="2"><span class="ps-lbl">OT hrs:</span> <?php echo number_format((float)$se['ot_hours'], 1); ?></td>
-                        <td colspan="3" class="ps-note">OT hrs = prev week's DTR (Sun-Sat)</td>
+                        <td><span class="ps-lbl">OT hrs (last wk):</span> <?php echo number_format((float)$se['ot_hours'], 1); ?></td>
+                        <td><span class="ps-lbl">Lag OT (last Sat):</span> <?php echo rtrim(rtrim(number_format((float)$lag_ot, 2), '0'), '.'); ?></td>
+                        <td colspan="3" class="ps-note">= last wk's DTR OT (Sun-Sat)</td>
                     </tr>
                     <tr class="ps-att-head">
                         <?php foreach ($day_labels as $d): ?>
@@ -244,16 +249,13 @@ $prev_sat = $payroll ? prDate(date('Y-m-d', strtotime($payroll['week_start'] . '
                         <?php endforeach; ?>
                     </tr>
                     <tr class="ps-note-row">
-                        <td colspan="7">P present / A absent / H half-day &middot; OT per day below &middot; <strong>Sat OT always 0 here - recorded Sat OT pays next payroll</strong></td>
+                        <td colspan="7">P present / A absent / H half-day &middot; OT hrs below = this week's DTR (Sun-Sat) &middot; <strong>Sat OT always 0 here - recorded Sat OT is paid next payroll as Lag OT</strong></td>
                     </tr>
                     <tr class="ps-money">
                         <td><span class="ps-lbl">Basic:</span> <?php echo prMoney($se['basic']); ?></td>
                         <td><span class="ps-lbl">OT Pay:</span> <?php echo prMoney($se['ot_pay']); ?></td>
-                        <td><span class="ps-lbl">Flat:</span> <?php echo prMoney($se['flat_pay']); ?></td>
                         <td><span class="ps-lbl">Gross:</span> <strong><?php echo prMoney($se['gross']); ?></strong></td>
-                        <td><span class="ps-lbl">Per. CA:</span> <?php echo prMoney($se['personal_cash_advance']); ?></td>
-                        <td><span class="ps-lbl">Cash Adv:</span> <?php echo prMoney($se['cash_advance']); ?></td>
-                        <td><span class="ps-lbl">Deduct:</span> <?php echo prMoney($se['deduction']); ?></td>
+                        <td colspan="4"><span class="ps-lbl">Deduct:</span> Cash Adv <?php echo prMoney($se['cash_advance']); ?> + Per. CA <?php echo prMoney($se['personal_cash_advance']); ?> = <?php echo prMoney($se['cash_advance'] + $se['personal_cash_advance']); ?></td>
                     </tr>
                     <tr class="ps-net">
                         <td colspan="7">NET PAY: <?php echo prMoney($se['net']); ?></td>
