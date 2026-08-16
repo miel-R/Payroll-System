@@ -546,6 +546,23 @@ a {
 .payslip-stub .ps-lbl {
     color: #555;
 }
+.payslip-stub .ps-day,
+.payslip-stub .ps-otv {
+    display: inline-block;
+    min-width: 15px;
+    text-align: center;
+}
+.payslip-stub .ps-day {
+    font-weight: 700;
+    padding: 0 2px;
+    border-bottom: 1px dotted #ccc;
+}
+.payslip-stub .ps-note {
+    color: #888;
+}
+.payslip-stub .ps-days {
+    align-items: baseline;
+}
 .payslip-stub .ps-net {
     font-weight: 700;
     font-size: 0.8rem;

@@ -393,6 +393,7 @@ function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $pr
     $pad = 5;
     $x1 = $x + $pad;
     $size = 6.2;
+    $small = 5.3;
     $pdf->box($x, $top - $h, $w, $h);
 
     // Header: PAYSLIP (left) + site (right)
@@ -420,11 +421,28 @@ function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $pr
         . '   Cash Adv: ' . prMoney($e['cash_advance'])
         . '   Deduction: ' . prMoney($e['deduction']));
 
+    // Attendance strip (this payroll week) + prev-week OT strip (Saturday = 0)
+    $codes = prNormAtt($e['attendance'] ?? '');
+    $codesStr = 'Att (S-S):';
+    foreach (str_split($codes) as $c) {
+        $codesStr .= ' ' . $c;
+    }
+    $codesStr .= '   * Sat OT recorded this wk pays next wk';
+    $pdf->textAt($x1, $top - 45.5, $small, 'N', $codesStr);
+
+    $otd = prOtDailyArray($e['ot_daily'] ?? '');
+    $otd[6] = 0.0;
+    $otStr = 'OT prev (S-S):';
+    foreach ($otd as $v) {
+        $otStr .= ' ' . rtrim(rtrim(number_format((float)$v, 2), '0'), '.');
+    }
+    $pdf->textAt($x1, $top - 53.5, $small, 'N', $otStr);
+
     // Week + NET PAY
     $weekStr = (string)$week;
-    $pdf->textAt($x + $w - $pad - strlen($weekStr) * 6 * 0.5, $top - 37, 6, 'N', $weekStr);
+    $pdf->textAt($x + $w - $pad - strlen($weekStr) * 6 * 0.5, $top - 62, 6, 'N', $weekStr);
     $netStr = 'NET PAY: ' . prMoney($e['net']);
-    $pdf->textAt($x + $w - $pad - strlen($netStr) * 7.5 * 0.5, $top - 46.5, 7.5, 'B', $netStr);
+    $pdf->textAt($x + $w - $pad - strlen($netStr) * 7.5 * 0.5, $top - 62, 7.5, 'B', $netStr);
 }
 
 /**

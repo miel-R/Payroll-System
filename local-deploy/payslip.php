@@ -2,7 +2,7 @@
 // E:\PAYROLL\payslip.php
 // Pick a site + payroll week, then choose scope:
 //   Per Person ........ one worker's compact payslip stub (print / PDF)
-//   Per Site (Week) ... all workers of that week, 5 stubs per portrait page
+//   Per Site (Week) ... all workers of that week, 10 stubs per bond page
 // Read-only for all roles (admin + finance).
 
 require_once __DIR__ . '/config/session.php';
@@ -122,14 +122,14 @@ $sheets = array_chunk($stub_rows, 10);
 $prev_sat = $payroll ? prDate(date('Y-m-d', strtotime($payroll['week_start'] . ' -1 day'))) : '';
 ?>
 
-<div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+<div class="page-head no-print d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
         <h3><i class="bi bi-receipt-cutoff"></i> Payslip</h3>
         <small class="text-muted">Pick a site and payroll week, then print per person or the whole site's week (10 payslips per bond page).</small>
     </div>
 </div>
 
-<div class="content-card">
+<div class="content-card no-print">
     <form method="get" class="row g-3 align-items-end">
         <div class="col-lg-3">
             <label class="form-label small mb-1" for="psSite">Site</label>
@@ -208,6 +208,21 @@ $prev_sat = $payroll ? prDate(date('Y-m-d', strtotime($payroll['week_start'] . '
                         <span><span class="ps-lbl">Rate/Day:</span> <?php echo prMoney($se['rate']); ?></span>
                         <span><span class="ps-lbl">Days:</span> <?php echo number_format((float)$se['days_worked'], 1); ?></span>
                         <span><span class="ps-lbl">OT hrs (from Sat <?php echo htmlspecialchars($prev_sat); ?>):</span> <?php echo number_format((float)$se['ot_hours'], 1); ?></span>
+                    </div>
+                    <?php $stub_codes = prNormAtt($se['attendance'] ?? ''); ?>
+                    <div class="ps-line ps-days">
+                        <span class="ps-lbl">Att (S-S):</span>
+                        <?php foreach (str_split($stub_codes) as $c): ?>
+                            <span class="ps-day"><?php echo htmlspecialchars($c); ?></span>
+                        <?php endforeach; ?>
+                        <span class="ps-note">* Sat OT recorded this wk pays next wk</span>
+                    </div>
+                    <?php $stub_otd = prOtDailyArray($se['ot_daily'] ?? ''); $stub_otd[6] = 0.0; ?>
+                    <div class="ps-line ps-otd">
+                        <span class="ps-lbl">OT prev (S-S):</span>
+                        <?php foreach ($stub_otd as $v): ?>
+                            <span class="ps-otv"><?php echo rtrim(rtrim(number_format((float)$v, 2), '0'), '.'); ?></span>
+                        <?php endforeach; ?>
                     </div>
                     <div class="ps-line">
                         <span><span class="ps-lbl">Basic:</span> <?php echo prMoney($se['basic']); ?></span>
