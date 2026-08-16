@@ -7,6 +7,7 @@
 $page_title = 'Daily Time Record';
 $active_page = 'dtr';
 require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/config/actions.php';
 
 $site_id = (int)($_GET['site_id'] ?? 0);
 $flash = [];
@@ -75,20 +76,15 @@ $week_start = date('Y-m-d', $ts - $dow * 86400);
 $week_end = date('Y-m-d', $ts + (6 - $dow) * 86400);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    if ($action === 'save') {
-        $workers = dbGetSiteEmployees($site_id);
-        $saved = 0;
-        foreach ($workers as $w) {
-            $k = (int)$w['id'];
-            $status = trim((string)($_POST['att_' . $k] ?? '.'));
-            $ot = (float)($_POST['otd_' . $k] ?? 0);
-            $note = trim((string)($_POST['note_' . $k] ?? ''));
-            if (dbSaveAttendance($k, $date, $status, $ot, $note)) {
-                $saved++;
-            }
-        }
-        $flash[] = ['success', 'Attendance saved for ' . date('M d, Y', strtotime($date)) . '.'];
+    $res = run_action((string)($_POST['action'] ?? ''), [
+        'post'     => $_POST,
+        'is_admin' => currentUserRole() === 'admin',
+        'user_id'  => (int)($_SESSION['user_id'] ?? 0),
+        'site_id'  => $site_id,
+        'date'     => $date,
+    ]);
+    if ($res['msg'] !== '') {
+        $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
     }
 }
 
@@ -100,22 +96,30 @@ foreach ($attendance as $a) {
     $att_map[(int)$a['site_employee_id']] = $a;
 }
 
-// Per-day fill counts for the week strip.
+// Per-day fill counts + OT totals for the week strip.
 $day_counts = [];
+$week_rollup = [];
 try {
-    $day_rows = dbFetchAll(
-        "SELECT work_date, COUNT(*) AS c
-         FROM attendance
-         WHERE work_date BETWEEN :ws AND :we
-           AND site_employee_id IN (SELECT id FROM site_employees WHERE site_id = :sid)
-         GROUP BY work_date",
-        [':ws' => $week_start, ':we' => $week_end, ':sid' => $site_id]
-    );
-    foreach ($day_rows as $r) {
-        $day_counts[$r['work_date']] = (int)$r['c'];
+    $week_rollup = dtr_week_rollup($site_id, $week_start);
+    foreach ($week_rollup as $wr) {
+        if ($wr['filled'] > 0) {
+            $day_counts[$wr['date']] = $wr['filled'];
+        }
     }
 } catch (PDOException $e) {
-    $day_counts = [];
+    $week_rollup = [];
+}
+
+$worker_count = count($workers);
+$day_set = 0;
+$day_ot = 0.0;
+foreach ($attendance as $a) {
+    $st = strtoupper((string)($a['status'] ?? '.'));
+    $st = in_array($st, ['P', 'A', 'H', '.'], true) ? $st : '.';
+    if ($st !== '.' || (float)($a['ot_hours'] ?? 0) > 0 || (string)($a['note'] ?? '') !== '') {
+        $day_set++;
+        $day_ot += (float)($a['ot_hours'] ?? 0);
+    }
 }
 
 $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -164,29 +168,41 @@ while ($d <= $week_end) {
         </form>
     </div>
 
-    <div class="row g-2 mb-3 week-strip">
+    <div class="row g-2 mb-3 week-strip" data-site="<?php echo $site_id; ?>">
+        <?php $week_map = [];
+        foreach ($week_rollup as $wr) {
+            $week_map[$wr['date']] = $wr;
+        } ?>
         <?php foreach ($week_days as $i => $day): ?>
             <?php
                 $is_selected = $day === $date;
                 $is_today = $day === date('Y-m-d');
-                $filled = isset($day_counts[$day]) ? $day_counts[$day] : 0;
+                $wr = $week_map[$day] ?? ['filled' => 0, 'ot_total' => 0.0];
+                $filled = (int)$wr['filled'];
+                $day_ot_total = (float)$wr['ot_total'];
                 $btn_class = $is_selected ? 'btn-dark' : ($filled > 0 ? 'btn-outline-success' : 'btn-outline-secondary');
             ?>
             <div class="col">
                 <a href="dtr.php?site_id=<?php echo $site_id; ?>&date=<?php echo $day; ?>"
-                    class="btn btn-sm w-100 <?php echo $btn_class; ?>">
-                    <div><?php echo $day_labels[$i]; ?></div>
-                    <div><?php echo (int)date('j', strtotime($day)); ?></div>
-                    <div class="small" style="font-size:0.7em">
-                        <?php echo $filled > 0 ? $filled . ' set' : ''; ?>
-                        <?php echo $is_today ? 'today' : ''; ?>
+                    class="btn btn-sm w-100 dtr-day <?php echo $btn_class; ?>" data-date="<?php echo $day; ?>" title="<?php echo $filled; ?>/<?php echo $worker_count; ?> set">
+                    <div class="dtr-day-dow"><?php echo $day_labels[$i]; ?></div>
+                    <div class="dtr-day-num"><?php echo (int)date('j', strtotime($day)); ?></div>
+                    <div class="small dtr-day-meta" style="font-size:0.68em">
+                        <span class="dtr-day-count"><?php echo $filled > 0 ? $filled . '/' . $worker_count : ''; ?></span>
+                        <span class="dtr-day-ot"><?php echo $day_ot_total > 0 ? number_format($day_ot_total, 2) . 'h' : ''; ?></span>
+                        <?php if ($is_today): ?><span class="text-muted">today</span><?php endif; ?>
                     </div>
                 </a>
             </div>
         <?php endforeach; ?>
     </div>
 
-    <h5 class="mb-2"><?php echo date('l, F j, Y', strtotime($date)); ?></h5>
+    <h5 class="mb-1" id="dtrDayHeading"><?php echo date('l, F j, Y', strtotime($date)); ?></h5>
+    <div class="text-muted small mb-3" id="dtrSummary">
+        <span class="fw-semibold"><?php echo (int)$worker_count; ?></span> workers &middot;
+        <span class="dtr-summary-set"><?php echo $day_set > 0 ? $day_set . ' set' : '0 set'; ?></span> &middot;
+        <span class="dtr-summary-ot"><?php echo $day_ot > 0 ? number_format($day_ot, 2) . 'h OT' : '0h OT'; ?></span>
+    </div>
 
     <?php if (!$workers): ?>
         <div class="alert alert-warning mb-0">
@@ -195,9 +211,9 @@ while ($d <= $week_end) {
         </div>
     <?php else: ?>
         <form method="POST" action="dtr.php?site_id=<?php echo $site_id; ?>&date=<?php echo htmlspecialchars($date); ?>"
-            data-ajax>
+            id="dtrForm" data-api>
             <?php echo csrf_field(); ?>
-            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="action" value="dtr.save_day">
 
             <div class="table-responsive d-none d-lg-block dtr-table">
                 <table class="table table-hover align-middle">
@@ -211,13 +227,14 @@ while ($d <= $week_end) {
                             <th>Note</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="dtrRows">
                         <?php foreach ($attendance as $a):
                             $k = (int)$a['site_employee_id'];
                             $status = strtoupper((string)($a['status'] ?? '.'));
                             $status = in_array($status, ['P', 'A', 'H', '.'], true) ? $status : '.';
+                            $has_val = $status !== '.' || (float)($a['ot_hours'] ?? 0) > 0 || (string)($a['note'] ?? '') !== '';
                         ?>
-                            <tr>
+                            <tr class="<?php echo $has_val ? 'has-value' : ''; ?>">
                                 <td class="fw-semibold"><?php echo htmlspecialchars($a['name']); ?></td>
                                 <td class="text-muted small"><?php echo htmlspecialchars($a['position'] ?: '-'); ?></td>
                                 <td class="text-end"><?php echo prMoney($a['rate']); ?></td>
@@ -243,13 +260,14 @@ while ($d <= $week_end) {
                 </table>
             </div>
 
-            <div class="d-lg-none">
+            <div class="d-lg-none" id="dtrCards">
                 <?php foreach ($attendance as $a):
                     $k = (int)$a['site_employee_id'];
                     $status = strtoupper((string)($a['status'] ?? '.'));
                     $status = in_array($status, ['P', 'A', 'H', '.'], true) ? $status : '.';
+                    $has_val = $status !== '.' || (float)($a['ot_hours'] ?? 0) > 0 || (string)($a['note'] ?? '') !== '';
                 ?>
-                    <div class="border rounded p-3 mb-3">
+                    <div class="border rounded p-3 mb-3 <?php echo $has_val ? 'has-value' : ''; ?>">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="fw-semibold"><?php echo htmlspecialchars($a['name']); ?></div>
                             <div class="text-muted small">
@@ -260,7 +278,7 @@ while ($d <= $week_end) {
                         <div class="row g-2 mt-1">
                             <div class="col-4">
                                 <label class="form-label small mb-0">Status</label>
-                                <select class="form-select form-select-sm text-center" name="att_<?php echo $k; ?>">
+                                <select class="form-select form-select-sm text-center" data-name="att_<?php echo $k; ?>">
                                     <?php foreach (['P' => 'P', 'A' => 'A', 'H' => 'H', '.' => '.'] as $cv => $cl):
                                         $sel = $status === $cv ? 'selected' : ''; ?>
                                         <option value="<?php echo $cv; ?>" <?php echo $sel; ?>><?php echo $cl; ?></option>
@@ -270,11 +288,11 @@ while ($d <= $week_end) {
                             <div class="col-4">
                                 <label class="form-label small mb-0">OT Hours</label>
                                 <input type="number" step="0.5" min="0" class="form-control form-control-sm text-center"
-                                    name="otd_<?php echo $k; ?>" value="<?php echo (float)($a['ot_hours'] ?? 0); ?>">
+                                    data-name="otd_<?php echo $k; ?>" value="<?php echo (float)($a['ot_hours'] ?? 0); ?>">
                             </div>
                             <div class="col-4">
                                 <label class="form-label small mb-0">Note</label>
-                                <input type="text" class="form-control form-control-sm" name="note_<?php echo $k; ?>"
+                                <input type="text" class="form-control form-control-sm" data-name="note_<?php echo $k; ?>"
                                     value="<?php echo htmlspecialchars($a['note'] ?? ''); ?>" placeholder="opt.">
                             </div>
                         </div>
@@ -282,7 +300,7 @@ while ($d <= $week_end) {
                 <?php endforeach; ?>
             </div>
 
-            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save <?php echo date('M d', strtotime($date)); ?></button>
+            <button type="submit" class="btn btn-primary" id="dtrSaveBtn"><i class="bi bi-save"></i> Save <?php echo date('M d', strtotime($date)); ?></button>
         </form>
         <p class="text-muted small mt-3 mb-0">
             Code: <code>P</code> = present, <code>H</code> = half day, <code>A</code> = absent, <code>.</code> = no data.

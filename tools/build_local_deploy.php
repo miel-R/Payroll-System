@@ -28,11 +28,13 @@ $files = [
     'contact.php',
     'import_seed.php',
     'create_user.php',
+    'ajax.php',
     // Config
     'config/DBconnect.php',
     'config/DBgetPDO.php',
     'config/DBpayroll.php',
     'config/session.php',
+    'config/actions.php',
     'config/db_credentials.php.example',
     // Layout
     'inc/header.php',

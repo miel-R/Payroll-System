@@ -66,6 +66,7 @@ $allowed = [
     'logout.php',
     'import_seed.php',
     'contact.php',
+    'ajax.php',
 ];
 
 $name = $path === '/' ? 'index.php' : basename($path);

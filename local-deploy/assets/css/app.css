@@ -559,3 +559,29 @@ a {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ===== DTR day-strip + per-row value indicators ===== */
+.dtr-day-count {
+    display: inline-block;
+    font-weight: 700;
+    color: var(--success-color, #198754);
+}
+.dtr-day-ot {
+    display: inline-block;
+    font-weight: 600;
+    color: var(--muted-color, #6c757d);
+}
+.week-strip a.dtr-day.btn-outline-secondary .dtr-day-count,
+.week-strip a.dtr-day.btn-dark .dtr-day-count {
+    color: currentColor;
+}
+tr.has-value td {
+    background-color: rgba(25, 135, 84, 0.06);
+}
+#dtrCards .has-value {
+    border-color: rgba(25, 135, 84, 0.35) !important;
+    background-color: rgba(25, 135, 84, 0.06);
+}
+#dtrSummary span {
+    margin: 0 2px;
+}

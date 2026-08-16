@@ -5,6 +5,7 @@
 $page_title = 'Sites';
 $active_page = 'sites';
 require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/config/actions.php';
 
 $is_admin = currentUserRole() === 'admin';
 
@@ -16,38 +17,14 @@ if ($is_admin && isset($_GET['edit'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    if (!$is_admin) {
-        $flash[] = ['warning', 'Finance users can only view sites. Changes not saved.'];
-    } else {
-        try {
-            if ($action === 'add') {
-                $name = trim($_POST['name'] ?? '');
-                if ($name === '') {
-                    $flash[] = ['danger', 'Site name is required.'];
-                } else {
-                    dbAddSite($name);
-                    $flash[] = ['success', 'Site "' . htmlspecialchars($name) . '" added.'];
-                }
-            } elseif ($action === 'update') {
-                $id = (int)($_POST['id'] ?? 0);
-                $name = trim($_POST['name'] ?? '');
-                if ($id <= 0 || $name === '') {
-                    $flash[] = ['danger', 'Site name is required.'];
-                } else {
-                    dbUpdateSite($id, $name);
-                    $flash[] = ['success', 'Site updated.'];
-                }
-            } elseif ($action === 'delete') {
-                $id = (int)($_POST['id'] ?? 0);
-                if ($id > 0) {
-                    dbDeleteSite($id);
-                    $flash[] = ['success', 'Site deleted.'];
-                }
-            }
-        } catch (PDOException $e) {
-            $flash[] = ['danger', 'That site name is already in use.'];
-        }
+    $res = run_action((string)($_POST['action'] ?? ''), [
+        'post'     => $_POST,
+        'is_admin' => $is_admin,
+        'user_id'  => (int)($_SESSION['user_id'] ?? 0),
+        'site_id'  => 0,
+    ]);
+    if ($res['msg'] !== '') {
+        $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
     }
 }
 
@@ -127,9 +104,9 @@ try {
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     <form method="POST" action="sites.php" class="d-inline"
-                                        data-ajax data-confirm="Delete this site and all of its payroll data?">
+                                        data-api data-confirm="Delete this site and all of its payroll data?">
                                         <?php echo csrf_field(); ?>
-                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="action" value="site.delete">
                                         <input type="hidden" name="id" value="<?php echo (int)$s['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                                             <i class="bi bi-trash"></i>
@@ -174,9 +151,9 @@ try {
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form method="POST" action="sites.php" class="flex-fill"
-                                data-ajax data-confirm="Delete this site and all of its payroll data?">
+                                data-api data-confirm="Delete this site and all of its payroll data?">
                                 <?php echo csrf_field(); ?>
-                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="action" value="site.delete">
                                 <input type="hidden" name="id" value="<?php echo (int)$s['id']; ?>">
                                 <button type="submit" class="btn btn-outline-danger w-100" title="Delete">
                                     <i class="bi bi-trash"></i>
@@ -194,13 +171,13 @@ try {
     <div class="modal fade" id="siteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="sites.php" data-ajax>
+                <form method="POST" action="sites.php" data-api>
                     <?php echo csrf_field(); ?>
                     <?php if ($edit_site): ?>
-                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="action" value="site.update">
                         <input type="hidden" name="id" value="<?php echo (int)$edit_site['id']; ?>">
                     <?php else: ?>
-                        <input type="hidden" name="action" value="add">
+                        <input type="hidden" name="action" value="site.add">
                     <?php endif; ?>
                     <div class="modal-header">
                         <h5 class="modal-title">

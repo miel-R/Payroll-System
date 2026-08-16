@@ -5,69 +5,20 @@
 $page_title = 'Manage Users';
 $active_page = 'users';
 require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/config/actions.php';
 requireRole('admin');
 
 $flash = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    try {
-        if ($action === 'create') {
-            $username = trim($_POST['username'] ?? '');
-            $email = trim($_POST['email'] ?? '');
-            $password = (string)($_POST['password'] ?? '');
-            $role = (string)($_POST['role'] ?? 'finance');
-
-            if ($username === '' || $email === '' || $password === '') {
-                $flash[] = ['danger', 'Username, email and password are all required.'];
-            } elseif (dbUsernameExists($username)) {
-                $flash[] = ['danger', 'That username is already taken.'];
-            } elseif (dbEmailExists($email)) {
-                $flash[] = ['danger', 'That email is already in use.'];
-            } else {
-                dbCreateUser($username, $email, $password, $role);
-                $flash[] = ['success', 'User "' . htmlspecialchars($username) . '" created with role ' . htmlspecialchars($role) . '.'];
-            }
-        } elseif ($action === 'set_role') {
-            $id = (int)($_POST['id'] ?? 0);
-            $role = (string)($_POST['role'] ?? 'finance');
-            if ($id > 0 && $id !== (int)$_SESSION['user_id']) {
-                dbUpdateUserRole($id, $role);
-                $flash[] = ['success', 'Role updated.'];
-            } else {
-                $flash[] = ['warning', 'You cannot change your own role.'];
-            }
-        } elseif ($action === 'delete') {
-            $id = (int)($_POST['id'] ?? 0);
-            if ($id > 0 && $id !== (int)$_SESSION['user_id']) {
-                dbDeleteUser($id);
-                $flash[] = ['success', 'User deleted.'];
-            } else {
-                $flash[] = ['warning', 'You cannot delete your own account.'];
-            }
-        } elseif ($action === 'rename') {
-            $id = (int)($_POST['id'] ?? 0);
-            $newname = trim($_POST['username'] ?? '');
-            if ($id > 0 && $newname === '') {
-                $flash[] = ['danger', 'New username is required.'];
-            } elseif ($id > 0 && dbUsernameExists($newname)) {
-                $flash[] = ['danger', 'That username is already taken.'];
-            } elseif ($id > 0) {
-                dbRenameUser($id, $newname);
-                $flash[] = ['success', 'Username updated to "' . htmlspecialchars($newname) . '".'];
-            }
-        } elseif ($action === 'set_password') {
-            $id = (int)($_POST['id'] ?? 0);
-            $newpass = (string)($_POST['password'] ?? '');
-            if ($id > 0 && $newpass === '') {
-                $flash[] = ['danger', 'New password is required.'];
-            } elseif ($id > 0) {
-                dbUpdateUserPassword($id, $newpass);
-                $flash[] = ['success', 'Password updated.'];
-            }
-        }
-    } catch (PDOException $e) {
-        $flash[] = ['danger', 'Could not save: ' . htmlspecialchars($e->getMessage())];
+    $res = run_action((string)($_POST['action'] ?? ''), [
+        'post'     => $_POST,
+        'is_admin' => true,
+        'user_id'  => (int)($_SESSION['user_id'] ?? 0),
+        'site_id'  => 0,
+    ]);
+    if ($res['msg'] !== '') {
+        $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
     }
 }
 
@@ -92,8 +43,8 @@ $users = dbGetAllUsers();
     <div class="col-lg-4">
         <div class="content-card">
             <h4><i class="bi bi-person-plus"></i> New User</h4>
-            <form method="POST" action="users.php" autocomplete="off" data-ajax>
-                <input type="hidden" name="action" value="create">
+            <form method="POST" action="users.php" autocomplete="off" data-api>
+                <input type="hidden" name="action" value="user.create">
                 <?php echo csrf_field(); ?>
                 <div class="mb-3">
                     <label class="form-label" for="username">Username</label>
@@ -154,7 +105,7 @@ $users = dbGetAllUsers();
                                     <td><?php echo htmlspecialchars($u['email']); ?></td>
                                     <td class="text-center">
                                         <form method="POST" action="users.php" class="d-inline-flex gap-1 align-items-center">
-                                            <input type="hidden" name="action" value="set_role">
+                                            <input type="hidden" name="action" value="user.set_role">
                                             <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
                                             <?php echo csrf_field(); ?>
                                             <select class="form-select form-select-sm" name="role" <?php echo $is_self ? 'disabled' : ''; ?>>
@@ -176,8 +127,8 @@ $users = dbGetAllUsers();
                                         </button>
                                         <?php if (!$is_self): ?>
                                             <form method="POST" action="users.php" class="d-inline"
-                                                data-ajax data-confirm="Delete this user?">
-                                                <input type="hidden" name="action" value="delete">
+                                                data-api data-confirm="Delete this user?">
+                                                <input type="hidden" name="action" value="user.delete">
                                                 <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
                                                 <?php echo csrf_field(); ?>
                                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
@@ -216,8 +167,8 @@ $users = dbGetAllUsers();
                                 </button>
                                 <?php if (!$is_self): ?>
                                     <form method="POST" action="users.php" class="flex-fill"
-                                        data-ajax data-confirm="Delete this user?">
-                                        <input type="hidden" name="action" value="delete">
+                                        data-api data-confirm="Delete this user?">
+                                        <input type="hidden" name="action" value="user.delete">
                                         <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
                                         <?php echo csrf_field(); ?>
                                         <button type="submit" class="btn btn-outline-danger w-100" title="Delete">
@@ -251,7 +202,7 @@ $users = dbGetAllUsers();
                     <?php if (!$is_self): ?>
                         <h6 class="text-muted">Role</h6>
                         <form method="POST" action="users.php" class="d-flex gap-2 mb-3">
-                            <input type="hidden" name="action" value="set_role">
+                            <input type="hidden" name="action" value="user.set_role">
                             <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
                             <?php echo csrf_field(); ?>
                             <select class="form-select" name="role">
@@ -264,7 +215,7 @@ $users = dbGetAllUsers();
                     <?php endif; ?>
                     <h6 class="text-muted">Rename</h6>
                     <form method="POST" action="users.php" autocomplete="off">
-                        <input type="hidden" name="action" value="rename">
+                        <input type="hidden" name="action" value="user.rename">
                         <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
                         <?php echo csrf_field(); ?>
                         <div class="input-group mb-3">
@@ -275,7 +226,7 @@ $users = dbGetAllUsers();
                     </form>
                     <h6 class="text-muted">Reset Password</h6>
                     <form method="POST" action="users.php" autocomplete="off">
-                        <input type="hidden" name="action" value="set_password">
+                        <input type="hidden" name="action" value="user.set_password">
                         <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
                         <?php echo csrf_field(); ?>
                         <div class="input-group">

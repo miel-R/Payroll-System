@@ -9,8 +9,10 @@
 $page_title = 'Edit Payroll Entries';
 $active_page = 'sites';
 require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/config/actions.php';
 requireRole('admin');
 
+$is_admin = true;
 $payroll_id = (int)($_GET['payroll_id'] ?? 0);
 
 try {
@@ -57,92 +59,18 @@ try {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    try {
-        if ($action === 'save') {
-            $changes = 0;
-            // The 7 dates of this payroll week (Sun..Sat) - the admin grid edits
-            // this week's DTR attendance directly, so saving writes it back.
-            $week_dates = [];
-            for ($i = 0; $i < 7; $i++) {
-                $week_dates[] = date('Y-m-d', strtotime($week_start . " +$i days"));
-            }
-            foreach ($workers as $w) {
-                $k = (int)$w['id'];
-                $pa = $prev_att[$k] ?? ['codes' => '.......', 'days' => 0.0, 'ot_total' => 0.0, 'ot_daily' => '0,0,0,0,0,0,0'];
-
-                $codes = [];
-                foreach ($week_dates as $idx => $date) {
-                    $c = strtoupper(substr(trim((string)($_POST['att_' . $k . '_' . $idx] ?? '')), 0, 1));
-                    $c = in_array($c, ['P', 'A', 'H', '.'], true) ? $c : '.';
-                    $codes[] = $c;
-                    $otd = (float)($_POST['otd_' . $k . '_' . $idx] ?? 0);
-                    dbSaveAttendance($k, $date, $c, $otd);
-                }
-                $att = implode('', $codes);
-                $days = 0;
-                foreach ($codes as $c) {
-                    if ($c === 'P') {
-                        $days += 1;
-                    } elseif ($c === 'H') {
-                        $days += 0.5;
-                    }
-                }
-                $ot_daily = $pa['ot_daily'];
-                $ot = (float)$pa['ot_total'];
-
-                $ca = (float)($_POST['ca_' . $k] ?? 0);
-                $pca = (float)($_POST['pca_' . $k] ?? 0);
-                $ded = (float)($_POST['ded_' . $k] ?? 0);
-                $flat = (float)($_POST['flat_' . $k] ?? 0);
-
-                $hasEntry = isset($entries_by_se[$k]);
-                $isEmpty = $days == 0 && $ot == 0 && $ca == 0 && $pca == 0 && $ded == 0 && $flat == 0;
-
-                if ($isEmpty) {
-                    if ($hasEntry) {
-                        dbDelete('payroll_entries', ['id' => $entries_by_se[$k]['id']]);
-                        $changes++;
-                    }
-                    continue;
-                }
-                dbSavePayrollEntry($payroll_id, $k, $days, $ot, $ca, $ded, $att, $flat, $w['position'], $w['rate'], $pca, $ot_daily);
-                $changes++;
-            }
-            $flash[] = ['success', 'Saved ' . $changes . ' entry update(s) and DTR attendance.'];
-            $entries_by_se = prEntriesByWorker($payroll_id);
-        } elseif ($action === 'add_pca') {
-            $k = (int)($_POST['se_id'] ?? 0);
-            $amount = (float)($_POST['amount'] ?? 0);
-            $advance_date = trim($_POST['advance_date'] ?? '');
-            $note = trim($_POST['note'] ?? '');
-            if ($k > 0 && $amount > 0 && $advance_date !== '') {
-                dbAddPersonalCashAdvance($k, $amount, $advance_date, $note);
-                $flash[] = ['success', 'Personal cash advance recorded.'];
-            } else {
-                $flash[] = ['danger', 'Amount and date are required.'];
-            }
-        } elseif ($action === 'delete_pca') {
-            $id = (int)($_POST['pca_id'] ?? 0);
-            if ($id > 0) {
-                dbDeletePersonalCashAdvance($id);
-                $flash[] = ['success', 'Personal cash advance entry deleted.'];
-            }
-        } elseif ($action === 'transfer') {
-            $k = (int)($_POST['se_id'] ?? 0);
-            $to_site_id = (int)($_POST['to_site_id'] ?? 0);
-            $days = (float)($_POST['days'] ?? 0);
-            $note = trim($_POST['note'] ?? '');
-            if ($k > 0 && $to_site_id > 0 && $days > 0) {
-                dbAddWorkerTransfer($k, $to_site_id, $days, $payroll['week_start'], $payroll['week_end'], $note);
-                $flash[] = ['success', 'Worker transferred to the other site for ' . $days . ' day(s).'];
-            } else {
-                $flash[] = ['danger', 'Target site and days are required.'];
-            }
-        }
-    } catch (PDOException $e) {
-        $flash[] = ['danger', 'Could not save: ' . htmlspecialchars($e->getMessage())];
+    $res = run_action((string)($_POST['action'] ?? ''), [
+        'post'       => $_POST,
+        'is_admin'   => $is_admin,
+        'user_id'    => (int)($_SESSION['user_id'] ?? 0),
+        'site_id'    => $site_id,
+        'payroll_id' => $payroll_id,
+        'payroll'    => $payroll,
+    ]);
+    if ($res['msg'] !== '') {
+        $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
     }
+    $entries_by_se = prEntriesByWorker($payroll_id);
 }
 
 // Derived totals for display.
@@ -230,8 +158,8 @@ $totals = prPayrollTotals($entries, $payroll);
             <a href="site_workers.php?site_id=<?php echo $site_id; ?>" class="alert-link">Add workers</a> first.
         </div>
     <?php else: ?>
-        <form method="POST" action="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" id="entryForm" data-ajax>
-            <input type="hidden" name="action" value="save">
+        <form method="POST" action="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" id="entryForm" data-api>
+            <input type="hidden" name="action" value="payroll.save">
             <?php echo csrf_field(); ?>
             <div class="row g-3">
                 <?php foreach ($workers as $w):
@@ -372,8 +300,8 @@ $totals = prPayrollTotals($entries, $payroll);
                     </div>
 
                     <h6 class="text-muted">Add an advance</h6>
-                    <form method="POST" action="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" data-ajax>
-                        <input type="hidden" name="action" value="add_pca">
+                    <form method="POST" action="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" data-api>
+                        <input type="hidden" name="action" value="pca.add">
                         <input type="hidden" name="se_id" value="<?php echo $k; ?>">
                         <?php echo csrf_field(); ?>
                         <div class="row g-2">
@@ -408,8 +336,8 @@ $totals = prPayrollTotals($entries, $payroll);
                                         <td class="small text-muted"><?php echo htmlspecialchars($a['note'] ?: '-'); ?></td>
                                         <td class="text-end">
                                             <form method="POST" action="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" class="d-inline"
-                                                data-ajax data-confirm="Delete this advance?">
-                                                <input type="hidden" name="action" value="delete_pca">
+                                                data-api data-confirm="Delete this advance?">
+                                                <input type="hidden" name="action" value="pca.delete">
                                                 <input type="hidden" name="pca_id" value="<?php echo (int)$a['id']; ?>">
                                                 <?php echo csrf_field(); ?>
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -441,8 +369,8 @@ $totals = prPayrollTotals($entries, $payroll);
                 </div>
                 <div class="modal-body">
                     <p class="text-muted small">Moves this worker to the selected site for the current week so their days can be entered there.</p>
-                    <form method="POST" action="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" data-ajax>
-                        <input type="hidden" name="action" value="transfer">
+                    <form method="POST" action="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" data-api>
+                        <input type="hidden" name="action" value="worker.transfer">
                         <input type="hidden" name="se_id" value="<?php echo $k; ?>">
                         <?php echo csrf_field(); ?>
                         <div class="mb-3">

@@ -5,6 +5,7 @@
 $page_title = 'Payrolls';
 $active_page = 'sites';
 require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/config/actions.php';
 
 $is_admin = currentUserRole() === 'admin';
 
@@ -24,38 +25,14 @@ if (!$site) {
 $flash = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    if (!$is_admin) {
-        $flash[] = ['warning', 'Finance users can only view payrolls. Changes not saved.'];
-    } else {
-        try {
-            if ($action === 'add') {
-                $week_start = trim($_POST['week_start'] ?? '');
-                $week_end = trim($_POST['week_end'] ?? '');
-                $budget = (float)($_POST['budget'] ?? 0);
-                $site_deduction = (float)($_POST['site_deduction'] ?? 0);
-                $add_expenses = (float)($_POST['add_expenses'] ?? 0);
-
-                if ($week_start === '' || $week_end === '') {
-                    $flash[] = ['danger', 'Week start and end dates are required.'];
-                } elseif (strtotime($week_end) < strtotime($week_start)) {
-                    $flash[] = ['danger', 'Week end must be on or after week start.'];
-                } elseif (dbGetPayrollByWeek($site_id, $week_start, $week_end)) {
-                    $flash[] = ['warning', 'A payroll already exists for this week.'];
-                } else {
-                    dbAddPayroll($site_id, $week_start, $week_end, $budget, $site_deduction, $add_expenses);
-                    $flash[] = ['success', 'Payroll week added. Now add the per-worker entries.'];
-                }
-            } elseif ($action === 'delete') {
-                $id = (int)($_POST['id'] ?? 0);
-                if ($id > 0) {
-                    dbDeletePayroll($id);
-                    $flash[] = ['success', 'Payroll week deleted.'];
-                }
-            }
-        } catch (PDOException $e) {
-            $flash[] = ['danger', 'Could not save: ' . htmlspecialchars($e->getMessage())];
-        }
+    $res = run_action((string)($_POST['action'] ?? ''), [
+        'post'     => $_POST,
+        'is_admin' => $is_admin,
+        'user_id'  => (int)($_SESSION['user_id'] ?? 0),
+        'site_id'  => $site_id,
+    ]);
+    if ($res['msg'] !== '') {
+        $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
     }
 }
 
@@ -129,9 +106,9 @@ $payrolls = dbGetPayrolls($site_id);
                                 </a>
                                 <?php if ($is_admin): ?>
                                     <form method="POST" action="payrolls.php?site_id=<?php echo (int)$site_id; ?>"
-                                        class="d-inline" data-ajax data-confirm="Delete this payroll week?">
+                                        class="d-inline" data-api data-confirm="Delete this payroll week?">
                                         <?php echo csrf_field(); ?>
-                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="action" value="payroll.delete">
                                         <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                                             <i class="bi bi-trash"></i>
@@ -190,9 +167,9 @@ $payrolls = dbGetPayrolls($site_id);
                         </a>
                         <?php if ($is_admin): ?>
                             <form method="POST" action="payrolls.php?site_id=<?php echo (int)$site_id; ?>"
-                                class="flex-fill" data-ajax data-confirm="Delete this payroll week?">
+                                class="flex-fill" data-api data-confirm="Delete this payroll week?">
                                 <?php echo csrf_field(); ?>
-                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="action" value="payroll.delete">
                                 <input type="hidden" name="id" value="<?php echo (int)$p['id']; ?>">
                                 <button type="submit" class="btn btn-outline-danger w-100" title="Delete">
                                     <i class="bi bi-trash"></i>
@@ -210,9 +187,9 @@ $payrolls = dbGetPayrolls($site_id);
     <div class="modal fade" id="payrollModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="payrolls.php?site_id=<?php echo (int)$site_id; ?>" data-ajax>
+                <form method="POST" action="payrolls.php?site_id=<?php echo (int)$site_id; ?>" data-api>
                     <?php echo csrf_field(); ?>
-                    <input type="hidden" name="action" value="add">
+                    <input type="hidden" name="action" value="payroll.add">
                     <div class="modal-header">
                         <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add Payroll Week</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

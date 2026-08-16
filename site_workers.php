@@ -5,6 +5,7 @@
 $page_title = 'Site Workers';
 $active_page = 'sites';
 require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/config/actions.php';
 
 $is_admin = currentUserRole() === 'admin';
 
@@ -29,48 +30,14 @@ if ($is_admin && isset($_GET['edit'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
-    if (!$is_admin) {
-        $flash[] = ['warning', 'Finance users can only view workers. Changes not saved.'];
-    } else {
-        try {
-            if ($action === 'add') {
-                $name = trim($_POST['name'] ?? '');
-                $position = trim($_POST['position'] ?? '');
-                $rate = (float)($_POST['rate'] ?? 0);
-                if ($name === '') {
-                    $flash[] = ['danger', 'Employee name is required.'];
-                } else {
-                    $emp = dbFindEmployeeByName($name);
-                    if (!$emp) {
-                        dbInsert('employees', ['name' => $name]);
-                        $emp = dbFindEmployeeByName($name);
-                    }
-                    if (dbGetSiteEmployeeByEmployee($site_id, (int)$emp['id'])) {
-                        $flash[] = ['warning', htmlspecialchars($name) . ' is already assigned to this site.'];
-                    } else {
-                        dbAddSiteEmployee($site_id, (int)$emp['id'], $position, $rate);
-                        $flash[] = ['success', htmlspecialchars($name) . ' added to the site.'];
-                    }
-                }
-            } elseif ($action === 'update') {
-                $id = (int)($_POST['id'] ?? 0);
-                $position = trim($_POST['position'] ?? '');
-                $rate = (float)($_POST['rate'] ?? 0);
-                if ($id > 0) {
-                    dbUpdateSiteEmployee($id, $position, $rate);
-                    $flash[] = ['success', 'Worker updated.'];
-                }
-            } elseif ($action === 'delete') {
-                $id = (int)($_POST['id'] ?? 0);
-                if ($id > 0) {
-                    dbDeleteSiteEmployee($id);
-                    $flash[] = ['success', 'Worker removed (payroll entries deleted too).'];
-                }
-            }
-        } catch (PDOException $e) {
-            $flash[] = ['danger', 'Could not save: ' . htmlspecialchars($e->getMessage())];
-        }
+    $res = run_action((string)($_POST['action'] ?? ''), [
+        'post'     => $_POST,
+        'is_admin' => $is_admin,
+        'user_id'  => (int)($_SESSION['user_id'] ?? 0),
+        'site_id'  => $site_id,
+    ]);
+    if ($res['msg'] !== '') {
+        $flash[] = [$res['type'], htmlspecialchars($res['msg'])];
     }
 }
 
@@ -134,9 +101,9 @@ $workers = dbGetSiteEmployees($site_id);
                                     </a>
                                     <form method="POST" action="site_workers.php?site_id=<?php echo (int)$site_id; ?>"
                                         class="d-inline"
-                                        data-ajax data-confirm="Remove this worker and all of their payroll entries?">
+                                        data-api data-confirm="Remove this worker and all of their payroll entries?">
                                         <?php echo csrf_field(); ?>
-                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="action" value="worker.delete">
                                         <input type="hidden" name="id" value="<?php echo (int)$w['id']; ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                                             <i class="bi bi-trash"></i>
@@ -169,9 +136,9 @@ $workers = dbGetSiteEmployees($site_id);
                             </a>
                             <form method="POST" action="site_workers.php?site_id=<?php echo (int)$site_id; ?>"
                                 class="flex-fill"
-                                data-ajax data-confirm="Remove this worker and all of their payroll entries?">
+                                data-api data-confirm="Remove this worker and all of their payroll entries?">
                                 <?php echo csrf_field(); ?>
-                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="action" value="worker.delete">
                                 <input type="hidden" name="id" value="<?php echo (int)$w['id']; ?>">
                                 <button type="submit" class="btn btn-outline-danger w-100" title="Delete">
                                     <i class="bi bi-trash"></i>
@@ -189,13 +156,13 @@ $workers = dbGetSiteEmployees($site_id);
     <div class="modal fade" id="workerModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="site_workers.php?site_id=<?php echo (int)$site_id; ?>" data-ajax>
+                <form method="POST" action="site_workers.php?site_id=<?php echo (int)$site_id; ?>" data-api>
                     <?php echo csrf_field(); ?>
                     <?php if ($edit_worker): ?>
-                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="action" value="worker.update">
                         <input type="hidden" name="id" value="<?php echo (int)$edit_worker['id']; ?>">
                     <?php else: ?>
-                        <input type="hidden" name="action" value="add">
+                        <input type="hidden" name="action" value="worker.add">
                     <?php endif; ?>
                     <div class="modal-header">
                         <h5 class="modal-title">
