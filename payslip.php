@@ -118,13 +118,14 @@ if ($payroll && $entries) {
         $stub_rows = $entries;
     }
 }
-$sheets = array_chunk($stub_rows, 5);
+$sheets = array_chunk($stub_rows, 10);
+$prev_sat = $payroll ? prDate(date('Y-m-d', strtotime($payroll['week_start'] . ' -1 day'))) : '';
 ?>
 
 <div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
         <h3><i class="bi bi-receipt-cutoff"></i> Payslip</h3>
-        <small class="text-muted">Pick a site and payroll week, then print per person or the whole site's week (5 payslips per page).</small>
+        <small class="text-muted">Pick a site and payroll week, then print per person or the whole site's week (10 payslips per bond page).</small>
     </div>
 </div>
 
@@ -190,7 +191,7 @@ $sheets = array_chunk($stub_rows, 5);
     </div>
 
     <div class="small text-muted mb-2 no-print">
-        <?php echo count($stub_rows); ?> payslip(s) &middot; prints <?php echo count($sheets); ?> page(s), 5 per page.
+        <?php echo count($stub_rows); ?> payslip(s) &middot; prints <?php echo count($sheets); ?> page(s), 10 per page.
     </div>
 
     <?php foreach ($sheets as $sheet_rows): ?>
@@ -206,7 +207,7 @@ $sheets = array_chunk($stub_rows, 5);
                         <span><span class="ps-lbl">Worker:</span> <strong><?php echo htmlspecialchars($se['name']); ?></strong></span>
                         <span><span class="ps-lbl">Rate/Day:</span> <?php echo prMoney($se['rate']); ?></span>
                         <span><span class="ps-lbl">Days:</span> <?php echo number_format((float)$se['days_worked'], 1); ?></span>
-                        <span><span class="ps-lbl">OT hrs (prev):</span> <?php echo number_format((float)$se['ot_hours'], 1); ?></span>
+                        <span><span class="ps-lbl">OT hrs (from Sat <?php echo htmlspecialchars($prev_sat); ?>):</span> <?php echo number_format((float)$se['ot_hours'], 1); ?></span>
                     </div>
                     <div class="ps-line">
                         <span><span class="ps-lbl">Basic:</span> <?php echo prMoney($se['basic']); ?></span>

@@ -24,6 +24,8 @@ $entries = prWithCalc(dbGetPayrollEntries($payroll_id));
 $totals = prPayrollTotals($entries, $payroll);
 
 $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+$prev_start = date('Y-m-d', strtotime($payroll['week_start'] . ' -7 days'));
+$prev_end = date('Y-m-d', strtotime($payroll['week_end'] . ' -7 days'));
 ?>
 
 <div class="no-print d-flex justify-content-between align-items-center mb-3">
@@ -47,8 +49,15 @@ $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
                 <?php echo date('F j, Y', strtotime($payroll['week_end'])); ?>
             </div>
             <div class="text-muted small">BALI BINYE NA ENGR: <strong><?php echo prMoney($totals['budget']); ?></strong></div>
-            <div class="text-muted small" style="font-size:0.75em">* OT hrs are the previous week's DTR OT, paid on this payroll.</div>
+            <div class="text-muted small" style="font-size:0.75em">* OT hrs = the PREVIOUS week's DTR OT (Sun-Sat), paid on this payroll. This week's OT (incl. SATURDAY) is paid on the NEXT payroll.</div>
         </div>
+    </div>
+
+    <div class="alert alert-info py-2 small mb-3" role="alert">
+        <i class="bi bi-info-circle"></i> <strong>OT HRS*</strong> came from the <strong>PREVIOUS week's</strong> DTR
+        (<strong>Sun <?php echo prDate($prev_start); ?> - Sat <?php echo prDate($prev_end); ?></strong>) and are paid
+        on <strong>this</strong> payroll. OT recorded <strong>this</strong> week - including <strong>next SATURDAY</strong> -
+        will be paid on the <strong>NEXT</strong> week's payroll.
     </div>
 
     <div class="table-responsive">

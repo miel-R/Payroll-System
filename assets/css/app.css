@@ -517,43 +517,50 @@ a {
 /* ===== PAYSLIP STUBS ===== */
 .payslip-stub {
     border: 1px solid #999;
-    padding: 6px 10px;
-    margin-bottom: 6px;
+    padding: 2px 8px;
+    margin-bottom: 3px;
     background: #fff;
     color: #000;
+    font-size: 0.68rem;
 }
 .payslip-stub .ps-head {
     display: flex;
     gap: 8px;
     font-weight: 700;
+    font-size: 0.72rem;
     border-bottom: 1px solid #bbb;
-    padding-bottom: 3px;
-    margin-bottom: 4px;
+    padding-bottom: 1px;
+    margin-bottom: 2px;
 }
 .payslip-stub .ps-week {
     margin-left: auto;
     font-weight: 600;
 }
 .payslip-stub .ps-line {
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 14px;
-    line-height: 1.4;
+    gap: 2px 12px;
+    line-height: 1.3;
 }
 .payslip-stub .ps-lbl {
     color: #555;
 }
 .payslip-stub .ps-net {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     border-top: 1px solid #bbb;
-    margin-top: 4px;
-    padding-top: 4px;
+    margin-top: 2px;
+    padding-top: 2px;
 }
 
 /* ===== PRINT ===== */
 @media print {
+    @page {
+        size: 8.5in 13in;
+        margin: 12mm;
+    }
+
     .sidebar,
     .app-topbar,
     .sidebar-backdrop,

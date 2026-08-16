@@ -87,7 +87,8 @@ $totals = prPayrollTotals($entries, $payroll);
         <h3 class="mb-0"><?php echo prDate($payroll['week_start']); ?> - <?php echo prDate($payroll['week_end']); ?></h3>
         <small class="text-muted">
             Days (P/A/H/.) and this week's OT are edited here and written back to the DTR.
-            OT Hrs <span class="text-muted">paid</span> are the previous week's DTR OT (OT is paid next payroll).
+            <strong>OT hrs paid = the PREVIOUS week's DTR (Sun-Sat, incl. Sat <?php echo prDate($prev_end); ?>)
+            - this week's OT (incl. SATURDAY) is paid on the NEXT payroll.</strong>
             <a href="dtr.php?site_id=<?php echo $site_id; ?>&date=<?php echo $week_start; ?>">Open DTR</a>
         </small>
     </div>
@@ -225,7 +226,7 @@ $totals = prPayrollTotals($entries, $payroll);
                                 </div>
                                 <div class="d-flex justify-content-between small mt-1">
                                     <span>Days: <strong class="cell-days"><?php echo $days; ?></strong></span>
-                                    <span>OT Hrs <span class="text-muted">(prev wk)</span>: <strong class="cell-ot"><?php echo $ot; ?></strong></span>
+                                    <span>OT Hrs <span class="text-muted">(from Sat <?php echo prDate($prev_end); ?>)</span>: <strong class="cell-ot"><?php echo $ot; ?></strong></span>
                                 </div>
                             </div>
 
