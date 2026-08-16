@@ -62,6 +62,7 @@ $allowed = [
     'payroll.php',
     'payroll_form.php',
     'payroll_view.php',
+    'payslip.php',
     'dtr.php',
     'users.php',
     'logout.php',
