@@ -67,6 +67,10 @@ if (!$site) {
 $date = (string)($_GET['date'] ?? '');
 if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     $date = date('Y-m-d');
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+        header('Location: dtr.php?site_id=' . (int)$site_id . '&date=' . $date);
+        exit();
+    }
 }
 
 // Week (Sun..Sat) that contains the selected date.
