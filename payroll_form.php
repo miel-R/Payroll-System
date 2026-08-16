@@ -231,11 +231,6 @@ $totals = prPayrollTotals($entries, $payroll);
 
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <label class="form-label small mb-0">Cash Adv.</label>
-                                    <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end in-ca"
-                                        name="ca_<?php echo $k; ?>" value="<?php echo $ca; ?>">
-                                </div>
-                                <div class="col-6">
                                     <label class="form-label small mb-0">Per. Cash Adv.</label>
                                     <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end in-pca"
                                         name="pca_<?php echo $k; ?>" value="<?php echo $pca; ?>">
@@ -249,6 +244,11 @@ $totals = prPayrollTotals($entries, $payroll);
                                     <?php else: ?>
                                         <div class="small text-muted mt-1">No outstanding personal CA.</div>
                                     <?php endif; ?>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-0">Cash Adv.</label>
+                                    <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end in-ca"
+                                        name="ca_<?php echo $k; ?>" value="<?php echo $ca; ?>">
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-0">Deduction</label>

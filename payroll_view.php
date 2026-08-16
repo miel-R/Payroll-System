@@ -65,8 +65,8 @@ $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
                     <th class="text-end">OT RATE</th>
                     <th class="text-end">OT PAY</th>
                     <th class="text-end">TOTAL</th>
-                    <th class="text-end">CASH ADV.</th>
                     <th class="text-end">PER. CASH ADV.</th>
+                    <th class="text-end">CASH ADV.</th>
                     <th class="text-end">INCOME</th>
                     <th class="text-end">NET</th>
                     <?php foreach ($day_labels as $dl): ?>
@@ -92,8 +92,8 @@ $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
                             <td class="text-end"><?php echo prMoney($e['ot_rate']); ?></td>
                             <td class="text-end"><?php echo prMoney($e['ot_pay']); ?></td>
                             <td class="text-end fw-semibold"><?php echo prMoney($e['gross']); ?></td>
-                            <td class="text-end"><?php echo prMoney($e['cash_advance']); ?></td>
                             <td class="text-end"><?php echo prMoney($e['personal_cash_advance']); ?></td>
+                            <td class="text-end"><?php echo prMoney($e['cash_advance']); ?></td>
                             <td class="text-end"><?php echo prMoney($e['gross'] - $e['cash_advance'] - $e['personal_cash_advance']); ?></td>
                             <td class="text-end fw-semibold"><?php echo prMoney($e['net']); ?></td>
                             <?php

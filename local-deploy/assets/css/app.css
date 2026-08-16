@@ -546,6 +546,32 @@ a {
 
     a {
         text-decoration: none;
+        color: #000 !important;
+    }
+
+    /* All-black print: strip every color/fill so text prints pure black. */
+    * {
+        color: #000 !important;
+        background-color: #fff !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        border-color: #999 !important;
+    }
+
+    .badge {
+        border: 1px solid #000 !important;
+    }
+
+    .table,
+    .table-bordered {
+        border-color: #999 !important;
+    }
+
+    th,
+    td {
+        color: #000 !important;
+        background-color: #fff !important;
     }
 }
 

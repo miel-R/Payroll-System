@@ -145,52 +145,6 @@ $default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
 </div>
 
 <div class="content-card">
-    <h4><i class="bi bi-wallet2"></i> Cash Advance History</h4>
-    <p class="text-muted small mb-3">The regular weekly cash advance deducted from each worker's pay (the "Cash Adv." entry).</p>
-    <?php if (!$ca_history): ?>
-        <p class="text-muted mb-0">No cash advances recorded yet. Enter them in each week's Edit / Save Entries.</p>
-    <?php else: ?>
-        <div class="d-flex align-items-center gap-2 mb-2">
-            <label class="form-label small mb-0" for="caWeekFilter">Week</label>
-            <select id="caWeekFilter" class="form-select form-select-sm w-auto js-table-filter"
-                data-filter-table="caHistoryTable" data-filter-key="week">
-                <option value="">All Weeks</option>
-                <?php foreach ($ca_week_pairs as $ws => $we): ?>
-                    <option value="<?php echo htmlspecialchars($ws); ?>" <?php echo $ws === $default_ca_week ? 'selected' : ''; ?>>
-                        <?php echo prDate($ws) . ' - ' . prDate($we); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle table-sm" id="caHistoryTable">
-                <thead class="table-light">
-                    <tr>
-                        <th>Week</th>
-                        <th>Site</th>
-                        <th>Worker</th>
-                        <th class="text-end">Cash Advance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($ca_history as $c): ?>
-                        <tr data-week="<?php echo htmlspecialchars($c['week_start']); ?>">
-                            <td><?php echo prDate($c['week_start']) . ' - ' . prDate($c['week_end']); ?></td>
-                            <td><?php echo htmlspecialchars($c['site_name']); ?></td>
-                            <td><?php echo htmlspecialchars($c['worker_name']); ?></td>
-                            <td class="text-end"><?php echo prMoney($c['cash_advance']); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <tr data-filter-empty style="display:none">
-                        <td colspan="99" class="text-center text-muted py-3">No cash advances match this week.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
-</div>
-
-<div class="content-card">
     <h4><i class="bi bi-cash-coin"></i> Personal Cash Advance History</h4>
 
     <div class="row g-3">
@@ -312,7 +266,53 @@ $default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
                 </div>
             <?php endif; ?>
         </div>
+</div>
     </div>
+
+<div class="content-card">
+    <h4><i class="bi bi-wallet2"></i> Cash Advance History</h4>
+    <p class="text-muted small mb-3">The regular weekly cash advance deducted from each worker's pay (the "Cash Adv." entry).</p>
+    <?php if (!$ca_history): ?>
+        <p class="text-muted mb-0">No cash advances recorded yet. Enter them in each week's Edit / Save Entries.</p>
+    <?php else: ?>
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <label class="form-label small mb-0" for="caWeekFilter">Week</label>
+            <select id="caWeekFilter" class="form-select form-select-sm w-auto js-table-filter"
+                data-filter-table="caHistoryTable" data-filter-key="week">
+                <option value="">All Weeks</option>
+                <?php foreach ($ca_week_pairs as $ws => $we): ?>
+                    <option value="<?php echo htmlspecialchars($ws); ?>" <?php echo $ws === $default_ca_week ? 'selected' : ''; ?>>
+                        <?php echo prDate($ws) . ' - ' . prDate($we); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle table-sm" id="caHistoryTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Week</th>
+                        <th>Site</th>
+                        <th>Worker</th>
+                        <th class="text-end">Cash Advance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($ca_history as $c): ?>
+                        <tr data-week="<?php echo htmlspecialchars($c['week_start']); ?>">
+                            <td><?php echo prDate($c['week_start']) . ' - ' . prDate($c['week_end']); ?></td>
+                            <td><?php echo htmlspecialchars($c['site_name']); ?></td>
+                            <td><?php echo htmlspecialchars($c['worker_name']); ?></td>
+                            <td class="text-end"><?php echo prMoney($c['cash_advance']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr data-filter-empty style="display:none">
+                        <td colspan="99" class="text-center text-muted py-3">No cash advances match this week.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($is_admin): ?>
