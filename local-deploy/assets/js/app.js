@@ -535,6 +535,27 @@
         if (backdrop) backdrop.addEventListener('click', close);
     }
 
+    /* ===== Table filters (Payroll hub history tables) ===== */
+    function bindTableFilters() {
+        document.querySelectorAll('select.js-table-filter').forEach(function (sel) {
+            const key = sel.getAttribute('data-filter-key') || '';
+            sel.addEventListener('change', function () {
+                const table = document.getElementById(sel.getAttribute('data-filter-table'));
+                if (!table) return;
+                const value = sel.value;
+                let visible = 0;
+                table.querySelectorAll('tbody tr').forEach(function (row) {
+                    if (row.hasAttribute('data-filter-empty')) return;
+                    const show = key === '' || value === '' || row.getAttribute('data-' + key) === value;
+                    row.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+                const empty = table.querySelector('tr[data-filter-empty]');
+                if (empty) empty.style.display = visible ? 'none' : '';
+            });
+        });
+    }
+
     /* ===== Init ===== */
     PAYROLL.init = function () {
         document.querySelectorAll('#app-content form[data-api]').forEach(bindApiForm);
@@ -543,6 +564,7 @@
         bindDtr();
         bindDtrWeek();
         dtrCardSync();
+        bindTableFilters();
     };
 
     document.addEventListener('DOMContentLoaded', function () {

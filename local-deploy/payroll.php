@@ -43,6 +43,15 @@ try {
 $today = date('Y-m-d');
 $week_start_default = date('Y-m-d', strtotime('last sunday', strtotime($today . ' +1 day')));
 $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
+
+$ca_week_pairs = [];
+foreach ($ca_history as $c) {
+    $ca_week_pairs[(string)$c['week_start']] = (string)$c['week_end'];
+}
+$pca_week_pairs = [];
+foreach ($pca_recovery as $r) {
+    $pca_week_pairs[(string)$r['week_start']] = (string)$r['week_end'];
+}
 ?>
 
 <div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -139,8 +148,20 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
     <?php if (!$ca_history): ?>
         <p class="text-muted mb-0">No cash advances recorded yet. Enter them in each week's Edit / Save Entries.</p>
     <?php else: ?>
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <label class="form-label small mb-0" for="caWeekFilter">Week</label>
+            <select id="caWeekFilter" class="form-select form-select-sm w-auto js-table-filter"
+                data-filter-table="caHistoryTable" data-filter-key="week">
+                <option value="">All Weeks</option>
+                <?php foreach ($ca_week_pairs as $ws => $we): ?>
+                    <option value="<?php echo htmlspecialchars($ws); ?>">
+                        <?php echo prDate($ws) . ' - ' . prDate($we); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <div class="table-responsive">
-            <table class="table table-hover align-middle table-sm">
+            <table class="table table-hover align-middle table-sm" id="caHistoryTable">
                 <thead class="table-light">
                     <tr>
                         <th>Week</th>
@@ -151,13 +172,16 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
                 </thead>
                 <tbody>
                     <?php foreach ($ca_history as $c): ?>
-                        <tr>
+                        <tr data-week="<?php echo htmlspecialchars($c['week_start']); ?>">
                             <td><?php echo prDate($c['week_start']) . ' - ' . prDate($c['week_end']); ?></td>
                             <td><?php echo htmlspecialchars($c['site_name']); ?></td>
                             <td><?php echo htmlspecialchars($c['worker_name']); ?></td>
                             <td class="text-end"><?php echo prMoney($c['cash_advance']); ?></td>
                         </tr>
                     <?php endforeach; ?>
+                    <tr data-filter-empty style="display:none">
+                        <td colspan="99" class="text-center text-muted py-3">No cash advances match this week.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -173,21 +197,33 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
             <?php if (!$pca_ledger): ?>
                 <p class="text-muted small mb-0">No personal cash advances recorded yet. Use "Personal CA" on a worker's entry card.</p>
             <?php else: ?>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="form-label small mb-0" for="pcaStatusFilter">Status</label>
+                    <select id="pcaStatusFilter" class="form-select form-select-sm w-auto js-table-filter"
+                        data-filter-table="pcaLedgerTable" data-filter-key="status">
+                        <option value="">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="done">Paid / Done</option>
+                    </select>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle table-sm">
+                    <table class="table table-hover align-middle table-sm" id="pcaLedgerTable">
                         <thead class="table-light">
                             <tr>
                                 <th>Date</th>
                                 <th>Worker</th>
                                 <th>Site</th>
-                                <th class="text-end">Amount</th>
+                                <th class="text-end">Given</th>
+                                <th class="text-end">Recovered</th>
                                 <th class="text-end">Balance</th>
+                                <th>Status</th>
                                 <?php if ($is_admin): ?><th></th><?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($pca_ledger as $p): ?>
-                                <tr>
+                                <?php $done = $p['status'] === 'done'; ?>
+                                <tr data-status="<?php echo $done ? 'done' : 'pending'; ?>">
                                     <td><?php echo prDate($p['advance_date']); ?></td>
                                     <td>
                                         <?php echo htmlspecialchars($p['worker_name']); ?>
@@ -197,7 +233,15 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
                                     </td>
                                     <td><?php echo htmlspecialchars($p['site_name']); ?></td>
                                     <td class="text-end"><?php echo prMoney($p['amount']); ?></td>
+                                    <td class="text-end"><?php echo prMoney($p['recovered']); ?></td>
                                     <td class="text-end"><?php echo prMoney($p['balance']); ?></td>
+                                    <td>
+                                        <?php if ($done): ?>
+                                            <span class="badge text-bg-success">Paid</span>
+                                        <?php else: ?>
+                                            <span class="badge text-bg-warning">Pending</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <?php if ($is_admin): ?>
                                         <td class="text-end">
                                             <form method="POST" action="payroll.php" class="d-inline"
@@ -213,6 +257,9 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
                                     <?php endif; ?>
                                 </tr>
                             <?php endforeach; ?>
+                            <tr data-filter-empty style="display:none">
+                                <td colspan="99" class="text-center text-muted py-3">No personal cash advances match this status.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -224,8 +271,20 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
             <?php if (!$pca_recovery): ?>
                 <p class="text-muted small mb-0">No repayments recorded yet. "Skip this week" keeps a week off this list; the balance stays the same.</p>
             <?php else: ?>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="form-label small mb-0" for="pcaWeekFilter">Week</label>
+                    <select id="pcaWeekFilter" class="form-select form-select-sm w-auto js-table-filter"
+                        data-filter-table="pcaRepaidTable" data-filter-key="week">
+                        <option value="">All Weeks</option>
+                        <?php foreach ($pca_week_pairs as $ws => $we): ?>
+                            <option value="<?php echo htmlspecialchars($ws); ?>">
+                                <?php echo prDate($ws) . ' - ' . prDate($we); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle table-sm">
+                    <table class="table table-hover align-middle table-sm" id="pcaRepaidTable">
                         <thead class="table-light">
                             <tr>
                                 <th>Week</th>
@@ -236,13 +295,16 @@ $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
                         </thead>
                         <tbody>
                             <?php foreach ($pca_recovery as $r): ?>
-                                <tr>
+                                <tr data-week="<?php echo htmlspecialchars($r['week_start']); ?>">
                                     <td><?php echo prDate($r['week_start']) . ' - ' . prDate($r['week_end']); ?></td>
                                     <td><?php echo htmlspecialchars($r['site_name']); ?></td>
                                     <td><?php echo htmlspecialchars($r['worker_name']); ?></td>
                                     <td class="text-end"><?php echo prMoney($r['recovered']); ?></td>
                                 </tr>
                             <?php endforeach; ?>
+                            <tr data-filter-empty style="display:none">
+                                <td colspan="99" class="text-center text-muted py-3">No repayments match this week.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

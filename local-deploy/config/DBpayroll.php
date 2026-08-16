@@ -815,11 +815,20 @@ function dbPersonalCaHistoryAll() {
     ) ?: [];
 
     $balances = [];
+    $givens = [];
     foreach (array_unique(array_column($rows, 'site_employee_id')) as $se) {
-        $balances[(int)$se] = dbPersonalCaBalance((int)$se);
+        $se = (int)$se;
+        $balances[$se] = dbPersonalCaBalance($se);
+        $givens[$se] = 0.0;
+    }
+    foreach ($rows as $r) {
+        $givens[(int)$r['site_employee_id']] += (float)$r['amount'];
     }
     foreach ($rows as &$r) {
-        $r['balance'] = $balances[(int)$r['site_employee_id']];
+        $se = (int)$r['site_employee_id'];
+        $r['balance'] = $balances[$se];
+        $r['recovered'] = round($givens[$se] - $balances[$se], 2);
+        $r['status'] = $balances[$se] > 0 ? 'pending' : 'done';
     }
     unset($r);
     return $rows;
