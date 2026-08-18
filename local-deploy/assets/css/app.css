@@ -530,11 +530,7 @@ a {
     font-size: 0.72rem;
 }
 .payslip-stub > tr > td {
-    border-bottom: 1px solid #999;
     padding: 2px 4px;
-}
-.payslip-stub > tr:last-child > td {
-    border-bottom: none;
 }
 
 /* header */
@@ -579,15 +575,6 @@ a {
     border-left: 1px solid #999;
 }
 
-/* legend above attendance */
-.payslip-stub .ps-legend {
-    text-align: center;
-    font-size: 0.6rem;
-    color: #555;
-    background: #fafafa;
-    padding: 1px 4px;
-}
-
 /* attendance table (S M T W T F S) */
 .payslip-stub .ps-att {
     width: 100%;
@@ -612,7 +599,7 @@ a {
     font-size: 0.72rem;
 }
 
-/* money (Basic / OT Pay / Gross) */
+/* money (Basic / OT Pay / legend) above attendance */
 .payslip-stub .ps-money-grid {
     width: 100%;
     border-collapse: collapse;
@@ -625,27 +612,43 @@ a {
 .payslip-stub .ps-money-grid td + td {
     border-left: 1px solid #999;
 }
-
-/* deduction block */
-.payslip-stub .ps-deduct-grid {
-    width: 100%;
-    border-collapse: collapse;
+.payslip-stub .ps-money-grid td.ps-legend-cell {
+    text-align: center;
+    font-size: 0.6rem;
+    color: #555;
+    background: #fafafa;
 }
-.payslip-stub .ps-deduct-grid td {
-    border: 1px solid #999;
-    padding: 1px 3px;
+
+/* bottom rows: Gross, NOTE, Deduction, CA, Per CA, Total Balance */
+.payslip-stub .ps-gross {
+    text-align: right;
+    font-size: 0.72rem;
+}
+.payslip-stub .ps-note {
+    padding: 2px 4px;
+}
+.payslip-stub .ps-note-box {
+    border: 1.5px solid #000;
+    border-collapse: collapse;
+    width: 210px;
+    margin: 0;
+}
+.payslip-stub .ps-note-box td {
+    padding: 2px 6px;
+    font-size: 0.66rem;
+}
+.payslip-stub .ps-deduct-line {
+    text-align: right;
+    font-weight: 700;
+    letter-spacing: 0.05em;
     font-size: 0.68rem;
 }
-.payslip-stub .ps-deduct-grid td + td {
-    border-left: 1px solid #999;
+.payslip-stub .ps-ca,
+.payslip-stub .ps-perca {
+    text-align: right;
+    font-size: 0.72rem;
 }
-.payslip-stub .ps-deduct-label {
-    text-align: center;
-    font-weight: 700;
-    background: #f0f0f0;
-    letter-spacing: 0.05em;
-}
-.payslip-stub .ps-total {
+.payslip-stub .ps-total-row {
     text-align: right;
     font-weight: 700;
     font-size: 0.86rem;
@@ -747,14 +750,13 @@ a {
     }
     .payslip-stub .ps-att th,
     .payslip-stub .ps-att td,
-    .payslip-stub .ps-money-grid td,
-    .payslip-stub .ps-deduct-grid td {
+    .payslip-stub .ps-money-grid td {
         padding: 0 2px;
     }
     .payslip-stub .ps-att-code td {
         font-size: 0.78rem;
     }
-    .payslip-stub .ps-total {
+    .payslip-stub .ps-total-row {
         font-size: 0.8rem;
         padding: 2px 5px;
     }
