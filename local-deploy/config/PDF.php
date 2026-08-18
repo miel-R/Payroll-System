@@ -89,7 +89,10 @@ function prPayslipStubHtml($se, $site_name, $week_label, $wk_att) {
     $html .= '</tr></table></td></tr>';
     $html .= '<tr><td><table class="ps-lower-grid"><tr>'
         . '<td class="ps-note-column"><table class="ps-note-box"><tr>'
-        . '<td>NOTE: Your overtime from last Saturday is paid in this payslip.</td>'
+        . '<td>NOTE: Your overtime from last Saturday is paid in this payslip.'
+        . '<br>CA = bale.'
+        . '<br>Per. CA = bale kay engr.'
+        . '<br>Lag OT = sabado Overtime.</td>'
         . '</tr></table></td>'
         . '<td class="ps-math-column"><table class="ps-fin-table">'
         . '<tr><td class="ps-fin-label">Gross:</td><td class="ps-fin-value">' . prMoney($se['gross']) . '</td></tr>'
