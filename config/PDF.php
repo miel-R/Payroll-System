@@ -54,24 +54,26 @@ function prPayslipStubHtml($se, $site_name, $week_label, $wk_att) {
     $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
     $html = '<table class="payslip-stub">';
-    $html .= '<tr><td class="ps-top"><table class="ps-top-grid"><tr>'
+    $html .= '<tr><td><table class="ps-top-grid"><tr>'
         . '<td class="ps-title">PAYSLIP</td>'
         . '<td class="ps-site"><strong>Site: ' . $e($site_name) . '</strong></td>'
         . '</tr></table></td></tr>';
     $html .= '<tr><td class="ps-week">Payroll Week: ' . $e($week_label) . '</td></tr>';
-    $html .= '<tr><td class="ps-worker"><span class="ps-lbl">Worker:</span> <strong>'
-        . $e($se['name']) . '</strong></td></tr>';
-    $html .= '<tr><td class="ps-meta"><table class="ps-meta-grid"><tr>'
+    $html .= '<tr><td>'
+        . '<div class="ps-worker"><span class="ps-lbl">Worker:</span> <strong>'
+        . $e($se['name']) . '</strong></div>'
+        . '<table class="ps-meta-grid"><tr>'
         . '<td><span class="ps-lbl">Rate/Day:</span> ' . prMoney($se['rate']) . '</td>'
         . '<td><span class="ps-lbl">Days:</span> ' . number_format((float)$se['days_worked'], 1) . '</td>'
         . '<td><span class="ps-lbl">Lag OT:</span> ' . $fmtOt($lag_ot) . '</td>'
-        . '</tr></table></td></tr>';
-    $html .= '<tr><td class="ps-money"><table class="ps-money-grid"><tr>'
+        . '</tr></table>'
+        . '</td></tr>';
+    $html .= '<tr><td><table class="ps-money-grid"><tr>'
         . '<td><span class="ps-lbl">Basic:</span> ' . prMoney($se['basic']) . '</td>'
         . '<td><span class="ps-lbl">OT Pay:</span> ' . prMoney($se['ot_pay']) . '</td>'
         . '<td class="ps-legend-cell">P present / A absent / H half-day</td>'
         . '</tr></table></td></tr>';
-    $html .= '<tr><td class="ps-att-wrap"><table class="ps-att">';
+    $html .= '<tr><td><table class="ps-att">';
     $html .= '<tr class="ps-att-head">';
     foreach ($day_labels as $d) {
         $html .= '<th>' . $d . '</th>';
@@ -85,14 +87,18 @@ function prPayslipStubHtml($se, $site_name, $week_label, $wk_att) {
         $html .= '<td>' . $fmtOt($v) . '</td>';
     }
     $html .= '</tr></table></td></tr>';
-    $html .= '<tr><td class="ps-gross">Gross: ' . prMoney($se['gross']) . '</td></tr>';
-    $html .= '<tr><td class="ps-note"><table class="ps-note-box"><tr>'
-        . '<td class="ps-note-text">NOTE: Your overtime from last Saturday is paid in this payslip.</td>'
+    $html .= '<tr><td><table class="ps-lower-grid"><tr>'
+        . '<td class="ps-note-column"><table class="ps-note-box"><tr>'
+        . '<td>NOTE: Your overtime from last Saturday is paid in this payslip.</td>'
+        . '</tr></table></td>'
+        . '<td class="ps-math-column"><table class="ps-fin-table">'
+        . '<tr><td class="ps-fin-label">Gross:</td><td class="ps-fin-value">' . prMoney($se['gross']) . '</td></tr>'
+        . '<tr><td colspan="2" class="ps-deduct-header">Deduction</td></tr>'
+        . '<tr><td class="ps-fin-label">CA:</td><td class="ps-fin-value">-' . prMoney($se['cash_advance']) . '</td></tr>'
+        . '<tr><td class="ps-fin-label">Per CA:</td><td class="ps-fin-value">-' . prMoney($se['personal_cash_advance']) . '</td></tr>'
+        . '</table></td>'
         . '</tr></table></td></tr>';
-    $html .= '<tr><td class="ps-deduct-line">Deduction</td></tr>';
-    $html .= '<tr><td class="ps-ca">CA: - ' . prMoney($se['cash_advance']) . '</td></tr>';
-    $html .= '<tr><td class="ps-perca">Per CA: - ' . prMoney($se['personal_cash_advance']) . '</td></tr>';
-    $html .= '<tr><td class="ps-total-row">Total Balance: ' . prMoney($se['net']) . '</td></tr>';
+    $html .= '<tr><td><div class="ps-total-row">Total Balance: ' . prMoney($se['net']) . '</div></td></tr>';
     $html .= '</table>';
     return $html;
 }
@@ -111,36 +117,45 @@ table.payslip-stub { width:100%; border-collapse:collapse; border:1pt solid #000
 table.payslip-stub > tr > td { padding:0.4pt 2.5pt; }
 
 table.ps-top-grid { width:100%; border-collapse:collapse; }
-table.ps-top-grid td { font-size:7pt; }
+table.ps-top-grid td { font-size:7pt; padding:0 2pt; }
 table.ps-top-grid .ps-title { text-align:left; font-weight:bold; letter-spacing:0.05em; }
 table.ps-top-grid .ps-site { text-align:right; }
 
-.ps-week { text-align:center; font-weight:bold; font-size:5.6pt; background:#eee; }
-.ps-worker { font-size:6.2pt; }
+.ps-week { text-align:center; font-weight:bold; font-size:5.6pt; background:#eee; border-top:0.5pt solid #000; border-bottom:0.5pt solid #000; padding:0.75pt 0; }
+.ps-worker { font-size:6.2pt; font-weight:bold; padding-top:0.75pt; }
 
-table.ps-meta-grid { width:100%; border-collapse:collapse; }
+table.ps-meta-grid { width:100%; border-collapse:collapse; margin-top:0.5pt; }
 table.ps-meta-grid td { font-size:5.8pt; padding:0 2pt; }
 table.ps-meta-grid td + td { border-left:0.5pt solid #000; }
 
-table.ps-money-grid { width:100%; border-collapse:collapse; }
+table.ps-money-grid { width:100%; border-collapse:collapse; margin-bottom:0.5pt; }
 table.ps-money-grid td { border:0.5pt solid #000; padding:0.5pt 2pt; font-size:6pt; }
 table.ps-money-grid td + td { border-left:0.5pt solid #000; }
-table.ps-money-grid td.ps-legend-cell { text-align:center; font-size:4.8pt; background:#f7f7f7; }
+table.ps-money-grid td.ps-legend-cell { text-align:center; font-size:4.8pt; background:#eee; }
 
-table.ps-att { width:100%; border-collapse:collapse; }
+table.ps-att { width:100%; border-collapse:collapse; margin:0.5pt 0; }
 table.ps-att th, table.ps-att td { border:0.5pt solid #000; padding:0.2pt 1pt; text-align:center; }
 table.ps-att th { background:#eee; font-size:5pt; }
 table.ps-att td { font-size:6pt; }
 table.ps-att tr.ps-att-code td { font-weight:bold; }
 table.ps-att tr.ps-att-ot td { font-size:5pt; }
 
-.ps-gross { text-align:right; font-size:6.2pt; }
-.ps-note { padding:0.5pt 2pt; }
-table.ps-note-box { border:0.75pt solid #000; border-collapse:collapse; width:60mm; }
-table.ps-note-box td { padding:0.75pt 3pt; font-size:5.4pt; }
-.ps-deduct-line { text-align:right; font-size:5.6pt; font-weight:bold; letter-spacing:0.05em; }
-.ps-ca, .ps-perca { text-align:right; font-size:6pt; }
-.ps-total-row { text-align:right; font-weight:bold; font-size:6.8pt; background:#eee; }
+table.ps-lower-grid { width:100%; border-collapse:collapse; margin-top:0.75pt; }
+table.ps-lower-grid td { vertical-align:top; padding:0; }
+td.ps-note-column { width:55%; padding-right:3pt; }
+td.ps-math-column { width:45%; }
+table.ps-note-box { border:0.75pt solid #000; border-collapse:collapse; width:100%; }
+table.ps-note-box td { padding:0.75pt 3pt; font-size:5.4pt; line-height:1.2; }
+
+table.ps-fin-table { width:100%; border-collapse:collapse; }
+table.ps-fin-table td { padding:0.5pt 0; font-size:6pt; }
+td.ps-fin-label { text-align:left; color:#000; }
+td.ps-fin-value { text-align:right; font-weight:bold; }
+td.ps-deduct-header { text-align:left; font-weight:bold; border-top:0.5pt dashed #000; padding-top:0.75pt; }
+
+.ps-total-row { text-align:right; font-weight:bold; font-size:7pt; background:#eee; border-top:1pt solid #000; padding:0.75pt 3pt; margin-top:0.75pt; }
+
+table.payslip-stub .ps-lbl { color:#333; font-weight:normal; }
 
 table.payslip-stub .ps-lbl { color:#333; font-weight:normal; }
 ';
