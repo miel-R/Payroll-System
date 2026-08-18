@@ -1,528 +1,166 @@
 <?php
+// E:\PAYROLL\config\PDF.php
+// PDF generation via dompdf (HTML -> PDF). Every PDF the app produces (payslips
+// and delete-backups) is built from the SAME HTML tables the screens show, so
+// print and PDF always match and the output renders in every viewer.
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Dompdf\Dompdf;
+use Dompdf\Options;
+
 /**
- * Minimal pure-PHP PDF generator (no external dependencies).
- * Uses the base-14 Helvetica font so nothing needs embedding.
- * Layout: US Letter portrait [0 0 612 792], 36pt side margins.
- * Provides a small cursor/table API plus ready-made backup builders for
- * payroll weeks and whole sites (used before delete to preserve the data).
+ * Render an HTML document to PDF bytes with dompdf.
+ * $paper: named size (e.g. 'letter') or array [x, y, w, h] in points.
  */
-
-// Escape a string for PDF text literals (only printable ASCII passes).
-function prPdfEsc($s) {
-    $s = (string)$s;
-    $s = preg_replace('/[^\x20-\x7E]/u', '?', $s);
-    return strtr($s, ['\\' => '\\\\', '(' => '\\(', ')' => '\\)']);
-}
-
-function prPdfNum($v) {
-    $v = (float)$v;
-    return $v === round($v) ? (string)(int)$v : sprintf('%.2F', $v);
-}
-
-final class PrPdf
-{
-    const W = 612;
-    const H = 792;
-    const ML = 36;
-    const MR = 36;
-    const MT = 42;
-    const MB = 34;
-
-    private $docTitle = '';
-    private $content = '';
-    private $pages = [];
-    private $page = 0;
-    private $y = 0;
-
-    public function __construct($docTitle = '') {
-        $this->docTitle = (string)$docTitle;
-        $this->newPage();
+function prPdfFromHtml($html, $paper = 'letter') {
+    $options = new Options();
+    $options->set('isRemoteEnabled', false);
+    $options->set('isPhpEnabled', false);
+    $options->set('tempDir', sys_get_temp_dir());
+    $options->set('isFontSubsettingEnabled', true);
+    $options->set('defaultFont', 'DejaVu Sans');
+    $root = realpath(__DIR__ . '/..');
+    if ($root !== false) {
+        $options->set('chroot', [$root]);
     }
-
-    private function newPage() {
-        if ($this->page > 0) {
-            $this->pages[] = $this->content;
-        }
-        $this->page++;
-        $this->content = '';
-        $this->y = self::H - self::MT;
-        $this->drawDocHeader();
-    }
-
-    public function pageBreak() {
-        $this->newPage();
-    }
-
-    private function drawDocHeader() {
-        if ($this->docTitle !== '') {
-            $this->rawText(self::ML, $this->y + 2, 9, 'B', $this->docTitle);
-        }
-        $this->content .= "BT /F1 8 Tf " . prPdfNum(self::W - self::MR - 110) . ' ' . prPdfNum($this->y + 2) . " Td (Generated " . date('M d, Y H:i') . "  -  Page " . $this->page . ") Tj ET\n";
-        $y = $this->y - 7;
-        $this->content .= sprintf("%s %s %s %s re S\n", prPdfNum(self::ML), prPdfNum($y), prPdfNum(self::W - self::ML - self::MR), prPdfNum(1));
-    }
-
-    private function ensureSpace($need) {
-        if ($this->y - $need < self::MB) {
-            $this->newPage();
-        }
-    }
-
-    private function rawText($x, $baseline, $size, $style, $str) {
-        $style = strtoupper($style) === 'B' ? 'F2' : 'F1';
-        $this->content .= sprintf(
-            "BT /%s %s Tf %s %s Td (%s) Tj ET\n",
-            $style, prPdfNum($size), prPdfNum($x), prPdfNum($baseline), prPdfEsc($str)
-        );
-    }
-
-    public function box($x, $y, $w, $h) {
-        $this->content .= sprintf("%s %s %s %s re S\n", prPdfNum($x), prPdfNum($y), prPdfNum($w), prPdfNum($h));
-    }
-
-    public function textAt($x, $baseline, $size, $style, $str) {
-        $this->rawText($x, $baseline, $size, $style, $str);
-    }
-
-    public function getY() {
-        return $this->y;
-    }
-
-    public function setY($v) {
-        $this->y = $v;
-    }
-
-    public function heading($text) {
-        $this->ensureSpace(28);
-        $this->y -= 16;
-        $this->content .= "BT /F2 12 Tf " . prPdfNum(self::ML) . ' ' . prPdfNum($this->y) . " Td (" . prPdfEsc($text) . ") Tj ET\n";
-        $this->y -= 6;
-        $this->content .= sprintf("%s %s %s %s re S\n", prPdfNum(self::ML), prPdfNum($this->y), prPdfNum(self::W - self::ML - self::MR), prPdfNum(1));
-    }
-
-    public function subheading($text) {
-        $this->ensureSpace(24);
-        $this->y -= 18;
-        $this->rawText(self::ML, $this->y, 10, 'B', $text);
-    }
-
-    public function paragraph($text, $size = 8.5) {
-        $text = (string)$text;
-        $maxChars = (int)((self::W - self::ML - self::MR) / ($size * 0.5));
-        $lines = mb_str_split($text, $maxChars);
-        $this->ensureSpace(count($lines) * 11 + 4);
-        foreach ($lines as $ln) {
-            $this->y -= 11;
-            $this->rawText(self::ML, $this->y, $size, 'N', $ln);
-        }
-    }
-
-    public function meta($label, $value) {
-        $this->ensureSpace(14);
-        $this->y -= 13;
-        $this->rawText(self::ML, $this->y, 8.5, 'B', $label . ':');
-        $this->rawText(self::ML + 95, $this->y, 8.5, 'N', (string)$value);
-    }
-
-    public function spacer($pts = 8) {
-        $this->ensureSpace($pts + 4);
-        $this->y -= $pts;
-    }
-
-    /**
-     * $headers: list of column names
-     * $rows:    list of cell arrays (each a scalar)
-     * $widths:  column widths in points (sum <= usable width)
-     * $right:   list of column indexes right-aligned (numbers)
-     */
-    public function table($headers, $rows, $widths, $right = []) {
-        $usable = self::W - self::ML - self::MR;
-        $scale = array_sum($widths) > $usable ? $usable / array_sum($widths) : 1;
-        $rowH = 13;
-        $x = [];
-        $acc = self::ML;
-        foreach ($widths as $w) {
-            $acc += $w * $scale;
-            $x[] = $acc;
-        }
-
-        $drawHeader = function () use ($headers, $x, $rowH) {
-            $this->ensureSpace($rowH);
-            $top = $this->y;
-            $bot = $top - $rowH;
-            $prev = self::ML;
-            foreach ($x as $cx) {
-                $this->content .= sprintf("0.9 0.9 0.9 rg %s %s %s %s re f\n",
-                    prPdfNum($prev), prPdfNum($bot), prPdfNum($cx - $prev), prPdfNum($rowH));
-                $this->content .= sprintf("%s %s %s %s re S\n",
-                    prPdfNum($prev), prPdfNum($bot), prPdfNum($cx - $prev), prPdfNum($rowH));
-                $prev = $cx;
-            }
-            foreach ($headers as $i => $h) {
-                $left = $i === 0 ? self::ML : $x[$i - 1];
-                $this->rawText($left + 3, $bot + 4, 7.2, 'B', $h);
-            }
-            $this->y = $bot;
-        };
-
-        $drawHeader();
-
-        foreach ($rows as $row) {
-            if ($this->y - $rowH < self::MB) {
-                $this->newPage();
-                $drawHeader();
-            }
-            $top = $this->y;
-            $bot = $top - $rowH;
-            $prev = self::ML;
-            foreach ($x as $cx) {
-                $this->content .= sprintf("%s %s %s %s re S\n",
-                    prPdfNum($prev), prPdfNum($bot), prPdfNum($cx - $prev), prPdfNum($rowH));
-                $prev = $cx;
-            }
-            foreach ($row as $i => $cell) {
-                $txt = (string)$cell;
-                $size = 7.4;
-                $left = $i === 0 ? self::ML : $x[$i - 1];
-                $cellRight = $x[$i];
-                $maxChars = (int)((($cellRight - $left) - 6) / ($size * 0.5));
-                if (strlen($txt) > $maxChars && $maxChars > 1) {
-                    $txt = substr($txt, 0, $maxChars - 1) . '..';
-                }
-                if (in_array($i, $right, true)) {
-                    $tw = strlen($txt) * $size * 0.5;
-                    $this->rawText($cellRight - 3 - $tw, $bot + 4, $size, 'N', $txt);
-                } else {
-                    $this->rawText($left + 3, $bot + 4, $size, 'N', $txt);
-                }
-            }
-            $this->y = $bot;
-        }
-    }
-
-    public function finish() {
-        if ($this->content !== '') {
-            $this->pages[] = $this->content;
-        }
-        $n = count($this->pages);
-        if ($n === 0) {
-            return "%PDF-1.4\n%%EOF";
-        }
-
-        $out = "%PDF-1.4\n";
-        $offsets = [];
-        $put = function ($body) use (&$out, &$offsets) {
-            $offsets[] = strlen($out);
-            $out .= $body . "\n";
-        };
-
-        $put("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj");
-        $kids = [];
-        for ($i = 1; $i <= $n; $i++) {
-            $kids[] = (3 + $i) . ' 0 R';
-        }
-        $put("2 0 obj\n<< /Type /Pages /Kids [" . implode(' ', $kids) . "] /Count " . $n . " >>\nendobj");
-        $put("3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj");
-        $put("4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj");
-
-        for ($i = 1; $i <= $n; $i++) {
-            $contentObj = 4 + $n + $i;
-            $put((4 + $i) . " 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " . self::W . " " . self::H . "] "
-                . "/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " . $contentObj . " 0 R >>\nendobj");
-        }
-        for ($i = 1; $i <= $n; $i++) {
-            $body = $this->pages[$i - 1];
-            $put((4 + $n + $i) . " 0 obj\n<< /Length " . strlen($body) . " >>\nstream\n" . $body . "\nendstream\nendobj");
-        }
-
-        $xref = strlen($out);
-        $out .= "xref\n0 " . (count($offsets) + 1) . "\n";
-        $out .= "0000000000 65535 f \n";
-        foreach ($offsets as $o) {
-            $out .= sprintf("%010d 00000 n \n", $o);
-        }
-        $out .= "trailer\n<< /Size " . (count($offsets) + 1) . " /Root 1 0 R >>\nstartxref\n" . $xref . "\n%%EOF";
-        return $out;
-    }
+    $dompdf = new Dompdf($options);
+    $dompdf->loadHtml($html, 'UTF-8');
+    $dompdf->setPaper($paper, 'portrait');
+    $dompdf->render();
+    return $dompdf->output();
 }
 
 /**
- * A table row array for the payroll (worker) backup: computed money cells.
+ * The payslip stub as a self-contained <table class="payslip-stub">.
+ * Shared by the on-screen/print view AND the PDF download so they stay in sync.
+ * $wk_att: dbWeekAttendanceByWorker() rollup for THIS week (per-day OT shown on
+ * the S M T W T F S grid, Saturday always 0). Lag OT = last Saturday's OT,
+ * pulled from the entry's ot_daily snapshot (previous week's DTR).
  */
-function prPdfEntryRows($entries) {
-    $rows = [];
-    foreach ($entries as $e) {
-        $rows[] = [
-            (string)$e['name'],
-            (string)($e['position'] ?? ''),
-            number_format((float)$e['rate'], 2),
-            number_format((float)$e['days_worked'], 1),
-            number_format((float)$e['ot_hours'], 1),
-            number_format((float)$e['basic'], 2),
-            number_format((float)$e['ot_pay'], 2),
-            number_format((float)$e['gross'], 2),
-            number_format((float)$e['personal_cash_advance'], 2),
-            number_format((float)$e['cash_advance'], 2),
-            number_format((float)$e['deduction'], 2),
-            number_format((float)$e['flat_pay'], 2),
-            number_format((float)$e['net'], 2),
-        ];
-    }
-    return $rows;
-}
-
-const PRPDF_ENTRY_WIDTHS = [100, 52, 28, 20, 20, 36, 30, 38, 30, 28, 22, 22, 40];
-const PRPDF_ENTRY_HEADERS = ['Worker', 'Position', 'Rate', 'Days', 'OT', 'Basic', 'OT Pay', 'Gross', 'Per.CA', 'Cash Adv', 'Ded', 'Flat', 'Net'];
-const PRPDF_ENTRY_RIGHT = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-/**
- * Full backup of one payroll week (entries with money math + totals).
- */
-function prPdfPayrollBackup($payroll, $entries, $site_name) {
-    $pdf = new PrPdf('PAYROLL BACKUP');
-    $pdf->heading('PAYROLL BACKUP');
-    $pdf->meta('Site', $site_name);
-    $pdf->meta('Week', prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']));
-    $pdf->meta('Payroll ID', $payroll['id']);
-    $pdf->meta('Entries', count($entries));
-
-    $totals = prPayrollTotals($entries, $payroll);
-    $pdf->meta('Budget (Cash Adv)', prMoney($totals['budget']));
-    $pdf->meta('Site Deduction', prMoney($totals['site_deduction']));
-    $pdf->meta('Add. Expenses', prMoney($totals['add_expenses']));
-    $pdf->meta('TOTAL PAYROLL', prMoney($totals['payroll_total']));
-    $pdf->meta('TOTAL TOTAL', prMoney($totals['net']));
-
-    $pdf->spacer(6);
-    $pdf->subheading('Entries');
-    $pdf->table(PRPDF_ENTRY_HEADERS, prPdfEntryRows($entries), PRPDF_ENTRY_WIDTHS, PRPDF_ENTRY_RIGHT);
-
-    $daysTot = 0; $otTot = 0; $basicTot = 0; $otPayTot = 0; $grossTot = 0;
-    $caTot = 0; $pcaTot = 0; $dedTot = 0; $flatTot = 0; $netTot = 0;
-    foreach ($entries as $e) {
-        $daysTot   += (float)$e['days_worked'];
-        $otTot     += (float)$e['ot_hours'];
-        $basicTot  += (float)$e['basic'];
-        $otPayTot  += (float)$e['ot_pay'];
-        $grossTot  += (float)$e['gross'];
-        $caTot     += (float)$e['cash_advance'];
-        $pcaTot    += (float)$e['personal_cash_advance'];
-        $dedTot    += (float)$e['deduction'];
-        $flatTot   += (float)$e['flat_pay'];
-        $netTot    += (float)$e['net'];
-    }
-    $footerRow = [
-        'TOTAL (' . count($entries) . ')', '', '',
-        number_format($daysTot, 1), number_format($otTot, 1),
-        number_format($basicTot, 2), number_format($otPayTot, 2), number_format($grossTot, 2),
-        number_format($pcaTot, 2), number_format($caTot, 2),
-        number_format($dedTot, 2), number_format($flatTot, 2),
-        number_format($netTot, 2),
-    ];
-    $pdf->table([], [$footerRow], PRPDF_ENTRY_WIDTHS, PRPDF_ENTRY_RIGHT);
-    return $pdf->finish();
-}
-
-/**
- * Full backup of a site: workers list, every payroll week with entries, plus
- * personal cash advances given to the site's workers.
- */
-function prPdfSiteBackup($site, $workers, $payrolls, $payrollEntriesById, $advances) {
-    $sep = str_repeat('-', 90);
-    $pdf = new PrPdf('SITE BACKUP');
-    $pdf->heading('SITE BACKUP');
-    $pdf->meta('Site', $site['name']);
-    $pdf->meta('Site ID', $site['id']);
-    $pdf->meta('Workers', count($workers));
-    $pdf->meta('Payroll Weeks', count($payrolls));
-
-    $pdf->spacer(6);
-    $pdf->subheading('Workers (' . count($workers) . ')');
-    $wRows = [];
-    foreach ($workers as $w) {
-        $wRows[] = [(string)$w['name'], (string)$w['position'], number_format((float)$w['rate'], 2)];
-    }
-    $pdf->table(['Worker', 'Position', 'Rate'], $wRows, [260, 150, 70], [2]);
-    $pdf->paragraph($sep);
-
-    if ($advances) {
-        $pdf->subheading('Personal Cash Advances (' . count($advances) . ')');
-        $aRows = [];
-        foreach ($advances as $a) {
-            $aRows[] = [
-                prDate($a['advance_date']),
-                (string)$a['worker_name'],
-                (string)$a['note'],
-                number_format((float)$a['amount'], 2),
-                number_format((float)$a['balance'], 2),
-            ];
-        }
-        $pdf->table(['Date', 'Worker', 'Note', 'Given', 'Balance'], $aRows, [60, 130, 190, 60, 60], [3, 4]);
-        $pdf->paragraph($sep);
-    }
-
-    foreach ($payrolls as $p) {
-        $pdf->pageBreak();
-        $entries = $payrollEntriesById[(int)$p['id']] ?? [];
-        $totals = $entries ? prPayrollTotals($entries, $p) : null;
-        $pdf->subheading('Week: ' . prDate($p['week_start']) . ' - ' . prDate($p['week_end']) . ' (' . count($entries) . ' entries)');
-        $pdf->meta('Budget', prMoney($p['budget']));
-        $pdf->meta('Site Deduction', prMoney($p['site_deduction']));
-        $pdf->meta('Add. Expenses', prMoney($p['add_expenses']));
-        if ($totals) {
-            $pdf->meta('TOTAL PAYROLL', prMoney($totals['payroll_total']));
-            $pdf->meta('TOTAL TOTAL', prMoney($totals['net']));
-        }
-        $pdf->spacer(2);
-        if ($entries) {
-            $pdf->table(PRPDF_ENTRY_HEADERS, prPdfEntryRows($entries), PRPDF_ENTRY_WIDTHS, PRPDF_ENTRY_RIGHT);
-        } else {
-            $pdf->paragraph('(no entries)');
-        }
-        $pdf->paragraph($sep);
-        $pdf->spacer(4);
-    }
-    return $pdf->finish();
-}
-
-/**
- * Draw one payslip as a compact aligned table (half page width).
- * Fits 10 per bond page (2 columns x 5 rows) with $h = 125, $gap 10.
- */
-function prPdfDrawPayslipStub($pdf, $e, $x, $top, $w, $h, $site_name, $week, $prevEnd, $wk_otd, $lag_ot) {
-    $pad = 8;
-    $x1 = $x + $pad;
-    $xr = $x + $w - $pad;
-    $cw = $w - $pad * 2;
-    $mid = $x1 + $cw / 2;
-    $size = 7.5;
-    $pdf->box($x, $top - $h, $w, $h);
-
-    // Header: PAYSLIP (left) + site - week (right)
-    $pdf->textAt($x1, $top - 9, 8.5, 'B', 'PAYSLIP');
-    $headR = (string)$site_name . ' | ' . (string)$week;
-    $pdf->textAt($xr - strlen($headR) * 7 * 0.5, $top - 9, 7, 'N', $headR);
-    $pdf->box($x, $top - 12.5, $w, 0.6);
-
-    // Worker + rate / days / OT
-    $otFmt = function ($v) {
-        return $v == round($v) ? (string)(int)$v : sprintf('%g', $v);
+function prPayslipStubHtml($se, $site_name, $week_label, $wk_att) {
+    $e = function ($v) {
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     };
-    $pdf->textAt($x1, $top - 21, 8, 'B', 'Worker: ' . (string)$e['name']);
-    $pdf->textAt($x1, $top - 30, $size, 'N',
-        'Rate: ' . prMoney($e['rate'])
-        . '   Days: ' . number_format((float)$e['days_worked'], 1)
-        . '   OT (last wk): ' . number_format((float)$e['ot_hours'], 1)
-        . '   Lag OT: ' . $otFmt((float)$lag_ot));
-    $pdf->box($x, $top - 34, $w, 0.6);
+    $fmtOt = function ($v) {
+        return rtrim(rtrim(number_format((float)$v, 2), '0'), '.');
+    };
 
-    // Attendance grid: 7 columns (S M T W T F S) x (label / code / THIS-week OT, Sat=0)
-    $codes = prNormAtt($e['attendance'] ?? '');
-    $otd = $wk_otd;
+    $codes = str_split(prNormAtt($se['attendance'] ?? ''));
+    $wk = $wk_att[(int)$se['site_employee_id']] ?? null;
+    $otd = $wk ? prOtDailyArray($wk['ot_daily']) : [0, 0, 0, 0, 0, 0, 0];
     $otd[6] = 0.0;
-    $colw = $cw / 7;
-    $gTop = $top - 36;
-    $gBot = $top - 60;
-    $labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    foreach ($labels as $i => $lb) {
-        $cx = $x1 + $colw * ($i + 0.5);
-        $pdf->textAt($cx - 6 * 0.5, $top - 42, 6, 'B', $lb);
-        $pdf->textAt($cx - 7 * 0.5, $top - 50, 7, 'B', $codes[$i]);
-        $v = $otd[$i];
-        $vStr = $v == round($v) ? (string)(int)$v : sprintf('%g', $v);
-        $pdf->textAt($cx - 6 * 0.5, $top - 56, 6, 'N', $vStr);
-    }
-    for ($i = 1; $i < 7; $i++) {
-        $pdf->box($x1 + $colw * $i, $gTop, 0.6, $gBot - $gTop);
-    }
-    $pdf->box($x, $gBot, $w, 0.6);
+    $lag_ot = prOtDailyArray($se['ot_daily'] ?? '')[6];
+    $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    $deduct = round((float)$se['cash_advance'] + (float)$se['personal_cash_advance'], 2);
 
-    // Note under grid
-    $pdf->textAt($x1, $top - 64, 5.5, 'N',
-        'P present / A absent / H half-day.  OT below = this week DTR.  Sat OT 0 here - paid next wk as Lag OT.');
+    $html = '<table class="payslip-stub">';
+    $html .= '<tr class="ps-head"><th class="ps-title" colspan="4">PAYSLIP</th>'
+        . '<th class="ps-site" colspan="3">' . $e($site_name) . '</th></tr>';
+    $html .= '<tr class="ps-week"><td colspan="7">Payroll Week: ' . $e($week_label) . '</td></tr>';
+    $html .= '<tr class="ps-worker"><td colspan="7"><span class="ps-lbl">Worker:</span> <strong>'
+        . $e($se['name']) . '</strong></td></tr>';
+    $html .= '<tr class="ps-meta">'
+        . '<td><span class="ps-lbl">Rate/Day:</span> ' . prMoney($se['rate']) . '</td>'
+        . '<td><span class="ps-lbl">Days:</span> ' . number_format((float)$se['days_worked'], 1) . '</td>'
+        . '<td><span class="ps-lbl">OT hrs (last wk):</span> ' . number_format((float)$se['ot_hours'], 1) . '</td>'
+        . '<td><span class="ps-lbl">Lag OT (last Sat):</span> ' . $fmtOt($lag_ot) . '</td>'
+        . '<td colspan="3" class="ps-note">= last wk\'s DTR OT (Sun-Sat)</td></tr>';
+    $html .= '<tr class="ps-att-head">';
+    foreach ($day_labels as $d) {
+        $html .= '<th>' . $d . '</th>';
+    }
+    $html .= '</tr><tr class="ps-att-code">';
+    foreach ($codes as $c) {
+        $html .= '<td>' . $e($c) . '</td>';
+    }
+    $html .= '</tr><tr class="ps-att-ot">';
+    foreach ($otd as $v) {
+        $html .= '<td>' . $fmtOt($v) . '</td>';
+    }
+    $html .= '</tr>';
+    $html .= '<tr class="ps-note-row"><td colspan="7">P present / A absent / H half-day &middot; '
+        . 'OT hrs below = this week\'s DTR (Sun-Sat) &middot; <strong>Sat OT always 0 here - '
+        . 'recorded Sat OT is paid next payroll as Lag OT</strong></td></tr>';
+    $html .= '<tr class="ps-money">'
+        . '<td><span class="ps-lbl">Basic:</span> ' . prMoney($se['basic']) . '</td>'
+        . '<td><span class="ps-lbl">OT Pay:</span> ' . prMoney($se['ot_pay']) . '</td>'
+        . '<td><span class="ps-lbl">Gross:</span> <strong>' . prMoney($se['gross']) . '</strong></td>'
+        . '<td colspan="4"><span class="ps-lbl">Deduct:</span> Cash Adv ' . prMoney($se['cash_advance'])
+        . ' + Per. CA ' . prMoney($se['personal_cash_advance']) . ' = ' . prMoney($deduct) . '</td></tr>';
+    $html .= '<tr class="ps-net"><td colspan="7">NET PAY: ' . prMoney($se['net']) . '</td></tr>';
+    $html .= '</table>';
+    return $html;
+}
 
-    // Money grid: Basic | OT Pay, GROSS, then a full-width Deduct line
-    // (net = gross - cash adv - per. ca, so the Deduct total reconciles to NET)
-    $deductTotal = round((float)$e['cash_advance'] + (float)$e['personal_cash_advance'], 2);
-    $money = [
-        ['Basic', prMoney($e['basic']), 'OT Pay', prMoney($e['ot_pay'])],
-        ['GROSS', prMoney($e['gross']), '', ''],
-    ];
-    foreach ($money as $i => $row) {
-        $by = $top - 74 - $i * 9;
-        list($la, $va, $lb, $vb) = $row;
-        $pdf->textAt($x1, $by, $size, 'N', (string)$la . ':');
-        if ($va !== '') {
-            $pdf->textAt($mid - 5 - strlen($va) * $size * 0.5, $by, $size, 'N', $va);
+function prPayslipCss() {
+    return '
+@page { margin: 8mm; }
+body { font-family: DejaVu Sans, sans-serif; color:#000; margin:0; }
+.pagedoc h3 { font-size:11pt; margin:0 0 2pt 0; }
+.pagedoc p { font-size:7.5pt; margin:0 0 4pt 0; }
+table.sheet { width:100%; border-collapse:collapse; }
+table.sheet.pagebreak { page-break-after: always; }
+table.sheet td.stubcell { width:50%; vertical-align:top; padding:1.5mm; }
+table.payslip-stub { width:100%; border-collapse:collapse; }
+table.payslip-stub td, table.payslip-stub th { border:0.5pt solid #000; padding:1pt 2pt; font-size:6.8pt; line-height:1.2; }
+table.payslip-stub .ps-title { text-align:left; font-size:8pt; }
+table.payslip-stub .ps-site { text-align:right; font-weight:normal; font-size:6.5pt; }
+table.payslip-stub .ps-week td { font-size:6.5pt; }
+table.payslip-stub .ps-att-head th { text-align:center; font-size:6pt; }
+table.payslip-stub .ps-att-code td { text-align:center; font-weight:bold; font-size:7pt; }
+table.payslip-stub .ps-att-ot td { text-align:center; font-size:6pt; }
+table.payslip-stub .ps-note-row td { font-size:5.8pt; }
+table.payslip-stub .ps-note { font-size:6pt; }
+table.payslip-stub .ps-net td { font-weight:bold; text-align:right; font-size:8pt; }
+table.payslip-stub .ps-lbl { color:#333; font-weight:normal; }
+';
+}
+
+/**
+ * Full payslip document: 10 stubs per bond page (2 columns x 5 rows), matching
+ * the on-screen/print layout. Paper = 8.5in x 13in (612 x 936 pt).
+ */
+function prPayslipHtmlDoc($entries, $site_name, $week_label, $wk_att) {
+    $sheets = array_chunk($entries, 10);
+    $n = count($sheets);
+    $html = '<html><head><meta charset="utf-8"><style>' . prPayslipCss() . '</style></head><body>';
+    $html .= '<div class="pagedoc"><h3>PAYSLIPS</h3><p>'
+        . htmlspecialchars($week_label, ENT_QUOTES, 'UTF-8')
+        . ' &nbsp;|&nbsp; ' . htmlspecialchars($site_name, ENT_QUOTES, 'UTF-8')
+        . ' &nbsp;|&nbsp; ' . count($entries) . ' worker(s) &middot; 10 per page (2 columns of 5)</p>';
+    foreach ($sheets as $i => $sheet) {
+        $pb = ($i < $n - 1) ? ' pagebreak' : '';
+        $cells = [];
+        foreach ($sheet as $se) {
+            $cells[] = '<td class="stubcell">' . prPayslipStubHtml($se, $site_name, $week_label, $wk_att) . '</td>';
         }
-        if ($lb !== '') {
-            $pdf->textAt($mid + 5, $by, $size, 'N', (string)$lb . ':');
-            $pdf->textAt($xr - 5 - strlen($vb) * $size * 0.5, $by, $size, 'N', $vb);
+        $rows = (int)ceil(count($cells) / 2);
+        $html .= '<table class="sheet' . $pb . '">';
+        for ($r = 0; $r < $rows; $r++) {
+            $html .= '<tr>'
+                . ($cells[$r * 2] ?? '<td class="stubcell"></td>')
+                . ($cells[$r * 2 + 1] ?? '<td class="stubcell"></td>')
+                . '</tr>';
         }
-        $pdf->box($x, $by - 4.5, $w, 0.6);
+        $html .= '</table>';
     }
-    $by = $top - 74 - 18;
-    $dedStr = 'Deduct: Cash Adv ' . prMoney($e['cash_advance'])
-        . ' + Per. CA ' . prMoney($e['personal_cash_advance'])
-        . ' = ' . prMoney($deductTotal);
-    $pdf->textAt($x1, $by, $size, 'N', $dedStr);
-    $pdf->box($x, $by - 4.5, $w, 0.6);
-    $pdf->box($mid, $top - 78.5, 0.6, 18);
-
-    // NET PAY row
-    $netY = $top - 108;
-    $pdf->textAt($x1, $netY, 6.5, 'N', (string)$site_name . ' | ' . (string)$week);
-    $netStr = 'NET PAY: ' . prMoney($e['net']);
-    $pdf->textAt($xr - strlen($netStr) * 9.5 * 0.5, $netY, 9.5, 'B', $netStr);
+    $html .= '</div></body></html>';
+    return $html;
 }
 
 /**
  * Payslips for one or more workers of a payroll week (employee details only).
- * Layout: 10 payslips per portrait bond page (2 columns x 5 rows), each
- * payslip its own aligned table.
+ * 10 payslips per bond page (2 columns x 5 rows), each its own aligned table.
  */
 function prPdfPaySlips($payroll, $entries, $site_name) {
-    $pdf = new PrPdf('PAYSLIPS');
-    $pdf->heading('PAYSLIPS');
-    $pdf->paragraph(prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end'])
-        . '   |   ' . (string)$site_name . '   |   ' . count($entries) . ' worker(s)', 8.5);
-    $pdf->spacer(4);
-
-    $cols = 2;
-    $rows = 5;
-    $per = $cols * $rows;
-    $gapCol = 10;
-    $gapRow = 10;
-    $stubW = (PrPdf::W - PrPdf::ML - PrPdf::MR - $gapCol) / $cols;
-    $stubH = 125;
-    $week = prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']);
-    $prevEnd = prDate(date('Y-m-d', strtotime($payroll['week_start'] . ' -1 day')));
-
-    // This week's per-day OT (from the DTR/attendance table) for the S M T W T F S grid.
     $wk_att = [];
     if (function_exists('dbWeekAttendanceByWorker')) {
         $wk_att = dbWeekAttendanceByWorker((int)$payroll['site_id'], $payroll['week_start'], $payroll['week_end']);
     }
-
-    $yTop = $pdf->getY();
-    $i = 0;
-    foreach ($entries as $e) {
-        if ($i > 0 && $i % $per === 0) {
-            $pdf->pageBreak();
-            $yTop = $pdf->getY();
-        }
-        $col = $i % $cols;
-        $rowIdx = intdiv($i, $cols) % $rows;
-        $x = PrPdf::ML + $col * ($stubW + $gapCol);
-        $top = $yTop - $rowIdx * ($stubH + $gapRow);
-        $wk = $wk_att[(int)$e['site_employee_id']] ?? null;
-        $wk_otd = $wk ? prOtDailyArray($wk['ot_daily']) : [0, 0, 0, 0, 0, 0, 0];
-        $lag_ot = prOtDailyArray($e['ot_daily'] ?? '')[6];
-        prPdfDrawPayslipStub($pdf, $e, $x, $top, $stubW, $stubH, $site_name, $week, $prevEnd, $wk_otd, $lag_ot);
-        $i++;
-    }
-
-    return $pdf->finish();
+    $week_label = prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']);
+    $html = prPayslipHtmlDoc($entries, (string)$site_name, $week_label, $wk_att);
+    return prPdfFromHtml($html, [0, 0, 612, 936]);
 }
 
 /**
@@ -530,4 +168,161 @@ function prPdfPaySlips($payroll, $entries, $site_name) {
  */
 function prPdfPaySlip($payroll, $entry, $site_name) {
     return prPdfPaySlips($payroll, [$entry], $site_name);
+}
+
+// ============================================================
+// BACKUP PDFs (built before a site/payroll week is deleted)
+// ============================================================
+
+function prBackupCss() {
+    return '
+@page { margin: 10mm; }
+body { font-family: DejaVu Sans, sans-serif; color:#000; font-size:8pt; margin:0; }
+.doc h3 { font-size:13pt; margin:0 0 4pt 0; }
+.doc p { margin:0 0 2pt 0; font-size:8pt; }
+table.bk { width:100%; border-collapse:collapse; margin-top:5pt; }
+table.bk td, table.bk th { border:0.5pt solid #000; padding:1.5pt 3pt; font-size:6.5pt; line-height:1.25; }
+table.bk th { background:#eee; text-align:left; }
+table.bk td.num, table.bk th.num { text-align:right; }
+div.week { page-break-before: always; }
+.week h4 { font-size:9pt; margin:4pt 0 2pt 0; }
+';
+}
+
+function prBackupMetaRows($pairs) {
+    $html = '';
+    foreach ($pairs as $label => $value) {
+        $html .= '<p><strong>' . htmlspecialchars((string)$label, ENT_QUOTES, 'UTF-8')
+            . ':</strong> ' . htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8') . '</p>';
+    }
+    return $html;
+}
+
+function prEntriesTable($entries) {
+    $headers = ['Worker', 'Position', 'Rate', 'Days', 'OT', 'Basic', 'OT Pay', 'Gross', 'Per.CA', 'Cash Adv', 'Ded', 'Flat', 'Net'];
+    $html = '<table class="bk"><tr>';
+    foreach ($headers as $h) {
+        $html .= '<th' . (in_array($h, ['Rate', 'Days', 'OT', 'Basic', 'OT Pay', 'Gross', 'Per.CA', 'Cash Adv', 'Ded', 'Flat', 'Net'], true) ? ' class="num"' : '') . '>' . $h . '</th>';
+    }
+    $html .= '</tr>';
+
+    $sum = array_fill(0, 13, 0.0);
+    foreach ($entries as $e) {
+        $vals = [
+            (string)$e['name'], (string)($e['position'] ?? ''),
+            (float)$e['rate'], (float)$e['days_worked'], (float)$e['ot_hours'],
+            (float)$e['basic'], (float)$e['ot_pay'], (float)$e['gross'],
+            (float)$e['personal_cash_advance'], (float)$e['cash_advance'],
+            (float)$e['deduction'], (float)$e['flat_pay'], (float)$e['net'],
+        ];
+        $html .= '<tr>';
+        foreach ($vals as $i => $v) {
+            $cls = $i >= 2 ? ' class="num"' : '';
+            if ($i === 0 || $i === 1) {
+                $html .= '<td>' . htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8') . '</td>';
+            } else {
+                $num = $i === 3 ? number_format($v, 1) : number_format($v, 2);
+                $html .= '<td class="num">' . $num . '</td>';
+                if ($i >= 2) {
+                    $sum[$i] += $v;
+                }
+            }
+        }
+        $html .= '</tr>';
+    }
+
+    $html .= '<tr><td colspan="2"><strong>TOTAL (' . count($entries) . ')</strong></td>';
+    foreach (array_slice($sum, 2, null, true) as $i => $v) {
+        $num = $i === 3 ? number_format($v, 1) : number_format($v, 2);
+        $html .= '<td class="num"><strong>' . $num . '</strong></td>';
+    }
+    $html .= '</tr></table>';
+    return $html;
+}
+
+/**
+ * Full backup of one payroll week (entries with money math + totals).
+ */
+function prPdfPayrollBackup($payroll, $entries, $site_name) {
+    $totals = prPayrollTotals($entries, $payroll);
+    $html = '<html><head><meta charset="utf-8"><style>' . prBackupCss() . '</style></head><body>';
+    $html .= '<div class="doc"><h3>PAYROLL BACKUP</h3>';
+    $html .= prBackupMetaRows([
+        'Site' => (string)$site_name,
+        'Week' => prDate($payroll['week_start']) . ' - ' . prDate($payroll['week_end']),
+        'Payroll ID' => $payroll['id'],
+        'Entries' => count($entries),
+        'Budget (Cash Adv)' => prMoney($totals['budget']),
+        'Site Deduction' => prMoney($totals['site_deduction']),
+        'Add. Expenses' => prMoney($totals['add_expenses']),
+        'TOTAL PAYROLL' => prMoney($totals['payroll_total']),
+        'TOTAL TOTAL' => prMoney($totals['net']),
+    ]);
+    $html .= prEntriesTable($entries);
+    $html .= '</div></body></html>';
+    return prPdfFromHtml($html, 'letter');
+}
+
+/**
+ * Full backup of a site: workers list, every payroll week with entries, plus
+ * personal cash advances given to the site's workers.
+ */
+function prPdfSiteBackup($site, $workers, $payrolls, $payrollEntriesById, $advances) {
+    $html = '<html><head><meta charset="utf-8"><style>' . prBackupCss() . '</style></head><body>';
+    $html .= '<div class="doc"><h3>SITE BACKUP</h3>';
+    $html .= prBackupMetaRows([
+        'Site' => (string)($site['name'] ?? ''),
+        'Site ID' => $site['id'],
+        'Workers' => count($workers),
+        'Payroll Weeks' => count($payrolls),
+    ]);
+
+    $html .= '<h4>Workers (' . count($workers) . ')</h4>';
+    $html .= '<table class="bk"><tr><th>Worker</th><th>Position</th><th class="num">Rate</th></tr>';
+    foreach ($workers as $w) {
+        $html .= '<tr><td>' . htmlspecialchars((string)$w['name'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td>' . htmlspecialchars((string)$w['position'], ENT_QUOTES, 'UTF-8') . '</td>'
+            . '<td class="num">' . number_format((float)$w['rate'], 2) . '</td></tr>';
+    }
+    $html .= '</table>';
+
+    if ($advances) {
+        $html .= '<h4>Personal Cash Advances (' . count($advances) . ')</h4>';
+        $html .= '<table class="bk"><tr><th>Date</th><th>Worker</th><th>Note</th><th class="num">Given</th><th class="num">Balance</th></tr>';
+        foreach ($advances as $a) {
+            $html .= '<tr><td>' . prDate($a['advance_date']) . '</td>'
+                . '<td>' . htmlspecialchars((string)($a['worker_name'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td>' . htmlspecialchars((string)($a['note'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td class="num">' . number_format((float)$a['amount'], 2) . '</td>'
+                . '<td class="num">' . number_format((float)($a['balance'] ?? 0), 2) . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+
+    foreach ($payrolls as $p) {
+        $entries = $payrollEntriesById[(int)$p['id']] ?? [];
+        $totals = $entries ? prPayrollTotals($entries, $p) : null;
+        $html .= '<div class="week">';
+        $html .= '<h4>Week: ' . htmlspecialchars(prDate($p['week_start']) . ' - ' . prDate($p['week_end']), ENT_QUOTES, 'UTF-8')
+            . ' (' . count($entries) . ' entries)</h4>';
+        $pairs = [
+            'Budget' => prMoney($p['budget']),
+            'Site Deduction' => prMoney($p['site_deduction']),
+            'Add. Expenses' => prMoney($p['add_expenses']),
+        ];
+        if ($totals) {
+            $pairs['TOTAL PAYROLL'] = prMoney($totals['payroll_total']);
+            $pairs['TOTAL TOTAL'] = prMoney($totals['net']);
+        }
+        $html .= prBackupMetaRows($pairs);
+        if ($entries) {
+            $html .= prEntriesTable($entries);
+        } else {
+            $html .= '<p>(no entries)</p>';
+        }
+        $html .= '</div>';
+    }
+
+    $html .= '</div></body></html>';
+    return prPdfFromHtml($html, 'letter');
 }

@@ -47,6 +47,9 @@ $files = [
     'assets/js/app.js',
     // Schema
     'database/schema.sql',
+    // Composer (vendor/ is copied separately below)
+    'composer.json',
+    'composer.lock',
 ];
 
 $templates = [
@@ -89,6 +92,30 @@ foreach (array_merge($files, array_keys($templates)) as $rel) {
 if ($missing) {
     fwrite(STDERR, "Missing source files:\n  " . implode("\n  ", $missing) . "\n");
     exit(1);
+}
+
+// Copy the whole vendor/ tree (dompdf + deps) so the local deploy is self-contained.
+$vendor = $root . '/vendor';
+if (is_dir($vendor)) {
+    $it = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($vendor, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+    foreach ($it as $entry) {
+        $rel = substr($entry->getPathname(), strlen($root) + 1);
+        $target = $dest . '/' . $rel;
+        if ($entry->isDir()) {
+            mkdir($target, 0777, true);
+        } else {
+            if (!is_dir(dirname($target))) {
+                mkdir(dirname($target), 0777, true);
+            }
+            copy($entry->getPathname(), $target);
+            $copied++;
+        }
+    }
+} else {
+    fwrite(STDERR, "WARNING: no vendor/ directory; run 'php composer.phar install' first\n");
 }
 
 echo "Built local-deploy/ ($copied files)\n";

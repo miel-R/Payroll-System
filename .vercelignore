@@ -13,6 +13,11 @@ local-deploy
 # Real database credentials (never uploaded)
 config/db_credentials.php
 
+# Composer manifest excluded so vercel-php does NOT run `composer install`
+# at build (it deletes the committed vendor/). vendor/ is committed and used as-is.
+composer.json
+composer.lock
+
 # Dev-only pages (also not whitelisted in api/index.php)
 test_db.php
 check_user.php
