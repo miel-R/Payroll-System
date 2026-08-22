@@ -2,10 +2,9 @@
 // E:\PAYROLL\api\index.php
 // Vercel front controller (vercel-php runtime).
 //
-// Vercel only executes PHP files under api/. All other files in the repo root
-// are uploaded into the lambda, so this router dispatches page requests to the
-// real page scripts (index.php, sites.php, ...) and serves static assets from
-// assets/ itself. Only whitelisted pages are reachable.
+// Vercel only executes PHP files under api/. Page scripts live in public/
+// (the webroot layout); this router dispatches page requests to them and
+// serves public/assets/ itself. Only whitelisted pages are reachable.
 
 $uri = (string)($_SERVER['REQUEST_URI'] ?? '/');
 $path = parse_url($uri, PHP_URL_PATH);
@@ -16,11 +15,11 @@ $path = rawurldecode($path);
 $path = '/' . ltrim($path, '/');
 
 // ------------------------------------------------------------
-// Static assets: serve directly from assets/ with a content type.
+// Static assets: serve directly from public/assets/ with a content type.
 // ------------------------------------------------------------
 if (strpos($path, '/assets/') === 0) {
-    $file = realpath(__DIR__ . '/../' . $path);
-    $root = realpath(__DIR__ . '/../assets/');
+    $file = realpath(__DIR__ . '/../public' . $path);
+    $root = realpath(__DIR__ . '/../public/assets/');
     if ($file === false || $root === false || strpos($file, $root) !== 0 || !is_file($file)) {
         http_response_code(404);
         echo 'Not found';
@@ -80,7 +79,7 @@ if (!in_array($name, $allowed, true)) {
     exit();
 }
 
-$page = __DIR__ . '/../' . $name;
+$page = __DIR__ . '/../public/' . $name;
 if (!is_file($page)) {
     http_response_code(404);
     echo 'Not found';

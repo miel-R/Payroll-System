@@ -1,6 +1,6 @@
 <?php
 // E:\PAYROLL\create_user.php
-require_once __DIR__ . '/config/DBgetPDO.php';
+require_once __DIR__ . '/../src/config/DBgetPDO.php';
 
 $username = 'admin';
 $email = 'admin@example.com';

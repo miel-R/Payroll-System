@@ -5,7 +5,7 @@
 session-ses_020f.md
 
 # Real database credentials (never commit)
-config/db_credentials.php
+src/config/db_credentials.php
 
 # Logs
 *.log

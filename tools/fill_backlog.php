@@ -29,8 +29,8 @@ if ($is_local) {
     $_SERVER['SERVER_NAME'] = 'localhost';
 }
 
-require_once __DIR__ . '/../config/DBgetPDO.php';
-require_once __DIR__ . '/../config/DBpayroll.php';
+require_once __DIR__ . '/../src/config/DBgetPDO.php';
+require_once __DIR__ . '/../src/config/DBpayroll.php';
 
 $today = date('Y-m-d');
 $cur_start = date('Y-m-d', strtotime('last sunday', strtotime($today . ' +1 day')));

@@ -4,42 +4,41 @@ Conventions for the PHP Payroll System in this repo.
 
 ## Project layout
 
-- `index.php` - login page (public)
+- `public/index.php` - login page (public)
 - `dashboard.php`, `sites.php`, `site_workers.php`, `payrolls.php`,
-  `payroll.php`, `payroll_form.php`, `payroll_view.php`, `dtr.php`, `users.php` - authenticated pages
-- `dtr.php` - daily time record: pick a site + day, mark each worker P/A/H
+  `payroll.php`, `payroll_entries.php`, `ca_history.php`, `payroll_form.php`, `payslip.php`, `dtr.php`, `users.php` - authenticated pages (all in `public/`)
+- `public/dtr.php` - daily time record: pick a site + day, mark each worker P/A/H
   and their OT hours. Payroll days and paid OT are derived from these rows.
-- `logout.php`, `create_user.php`, `test_db.php` - auth/utility pages
-- `inc/header.php`, `inc/footer.php` - shared authenticated layout
+- `public/logout.php`, `contact.php`, `ajax.php` (AJAX endpoint), `test_db.php` - utility endpoints; CLI scripts live in `tools/`
+- `src/inc/header.php`, `src/inc/footer.php` - shared authenticated layout
   (set `$page_title` and `$active_page` = `dashboard` | `sites` | `dtr` | `users` first)
-- `config/DBconnect.php` - `dbCreds()` resolves credentials in order:
+- `src/config/DBconnect.php` - `dbCreds()` resolves credentials in order:
   env vars (`DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`) -> gitignored
-  `config/db_credentials.php` -> local defaults (localhost/root//wip0).
+  `src/config/db_credentials.php` -> local defaults (localhost/root//wip0).
   `dbconnect()` connects lazily and reuses a global `$pdo`.
-- `config/session.php` - `payroll_session_start()`; when env
+- `src/config/session.php` - `payroll_session_start()`; when env
   `PAYROLL_DB_SESSIONS=1` (Vercel) it registers a DB-backed session handler
   on the `sessions` table, otherwise native file sessions. All pages call
   this instead of `session_start()`.
-- `config/DBgetPDO.php` - PDO helpers (`dbFetchAll`, `dbFetchOne`, `dbInsert`,
+- `src/config/DBgetPDO.php` - PDO helpers (`dbFetchAll`, `dbFetchOne`, `dbInsert`,
   `dbUpdate`, `dbDelete`, `dbExecute`, `dbTableExists`) + user functions
   (incl. roles: `dbEnsureUserRoleColumn()`, `dbUpdateUserRole()`,
   `currentUserRole()`, `requireRole()`)
 - `database/schema.sql` - full SQL schema (all tables + `sessions`).
 - `api/index.php` + `vercel.json` - Vercel deployment: front controller routes
-  whitelisted page requests to the root `*.php` scripts and serves `assets/`
+  whitelisted page requests to the `public/*.php` scripts and serves `public/assets/`
   itself (catch-all route, `vercel-php@0.9.0` runtime).
-- `config/DBpayroll.php` - site/employee/payroll functions + calc helpers;
-  also `dbEnsurePayrollSchema()` (self-healing schema migration, called from
-  `inc/header.php` on every page load), DTR attendance helpers
+- `src/config/DBpayroll.php` - site/employee/payroll functions + calc helpers;
+  also `dbEnsurePayrollSchema()` (self-healing schema migration, called from the header on every page load), DTR attendance helpers
   (`dbSaveAttendance`, `dbGetAttendanceForDate`, `dbWeekAttendanceByWorker`),
   the personal cash advance ledger (`dbAddPersonalCashAdvance`,
   `dbDeletePersonalCashAdvance`, `dbGetPersonalCashAdvances`,
   `dbPersonalCaBalance`) and worker transfers
   (`dbAddWorkerTransfer`, `dbGetWorkerTransfers`).
-- `assets/` - `css/app.css` (app design system) and `js/app.js` (AJAX layer)
+- `public/assets/` - `css/app.css` (app design system) and `js/app.js` (AJAX layer)
   are local. Bootstrap 5.3.8 and Bootstrap Icons 1.11.3 are loaded from the
-  jsdelivr CDN (with SRI) in `inc/header.php`, `inc/footer.php`, `index.php`,
-  and `contact.php`. `css/index_style.css` is used only by `index.php`.
+  jsdelivr CDN (with SRI) in `src/inc/header.php`, `src/inc/footer.php`, `public/index.php`,
+  and `public/contact.php`. `css/index_style.css` is used only by the login page.
 - AJAX conventions: forms with `data-ajax` submit via fetch and swap
   `#app-content`; `data-confirm` opens the themed confirm modal; flash rows
   carry class `flash-toast` (converted to toasts by `app.js`). Every POST form
@@ -48,7 +47,7 @@ Conventions for the PHP Payroll System in this repo.
 
 ## Key rules
 
-- Every page begins with `payroll_session_start()` (via `config/session.php`,
+- Every page begins with `payroll_session_start()` (via `src/config/session.php`,
   or `inc/header.php` which does it) and redirects to `index.php` when not
   logged in.
 - DB connections are lazy: `require_once` only defines functions; call a helper

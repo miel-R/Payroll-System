@@ -13,8 +13,8 @@ if (PHP_SAPI !== 'cli') {
 }
 $dry = in_array('--dry', $argv, true);
 
-require_once __DIR__ . '/../config/DBconnect.php';
-require_once __DIR__ . '/../config/DBpayroll.php';
+require_once __DIR__ . '/../src/config/DBconnect.php';
+require_once __DIR__ . '/../src/config/DBpayroll.php';
 
 $payrolls = dbFetchAll("SELECT * FROM payrolls ORDER BY site_id ASC, week_start ASC");
 $scanned = 0;

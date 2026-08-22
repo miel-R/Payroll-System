@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/DBconnect.php';
+require_once __DIR__ . '/../src/config/DBconnect.php';
 
 dbconnect();
 
