@@ -92,21 +92,22 @@ if (currentUserRole() === 'admin') {
                 </div>
             </div>
 
-            <nav class="sidebar-nav">
+<nav class="sidebar-nav">
                 <?php foreach ($app_nav as $nav): ?>
                     <?php if ($nav[3] === '#'): ?>
                         <div class="dropdown">
-                            <a class="sidebar-link dropdown-toggle <?php echo $active_page === 'payroll' ? 'active' : ''; ?>"
-                                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <a class="sidebar-link <?php echo $active_page === 'payroll' ? 'active' : ''; ?>"
+                                style="position: relative;">
                                 <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
+                                <i class="bi bi-chevron-down float-end ms-2"></i>
                             </a>
-                            <ul class="dropdown-menu">
+                            <ul class="dropdown-menu p-3 small" style="min-width: 180px; position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,.15);">
 <li><a class="dropdown-item" href="payroll_entries.php"><i class="bi bi-pencil-square"></i> Entry</a></li>
 <li><a class="dropdown-item" href="payroll_view.php"><i class="bi bi-eye"></i> View</a></li>
 <li><a class="dropdown-item" href="payrolls.php"><i class="bi bi-plus-circle"></i> Add Payroll</a></li>
 <li><hr class="dropdown-divider"></li>
 <li><a class="dropdown-item" href="ca_history.php"><i class="bi bi-clock-history"></i> CA History</a></li>
-                            </ul>
+</ul>
                         </div>
                     <?php else: ?>
                         <a class="sidebar-link <?php echo $active_page === $nav[0] ? 'active' : ''; ?>"
