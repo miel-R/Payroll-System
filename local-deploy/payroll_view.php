@@ -1,6 +1,9 @@
 <?php
 // E:\PAYROLL\payroll_view.php
-// Printable weekly payroll report, mirroring the source spreadsheet layout.
+// Printable weekly payroll report. Three modes:
+//   no params        -> pick a site
+//   ?site_id=X       -> pick one of that site's weeks
+//   ?payroll_id=X    -> the report
 
 require_once __DIR__ . '/config/session.php';
 payroll_session_start();
@@ -11,40 +14,138 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/config/DBpayroll.php';
 
 $page_title = 'Payroll Report';
-$active_page = 'sites';
+$active_page = 'payroll';
 
 $payroll_id = (int)($_GET['payroll_id'] ?? 0);
+$site_id = (int)($_GET['site_id'] ?? 0);
+
+$sites = [];
+$site = null;
+$payroll = null;
+$weeks = [];
+$entries = [];
+$totals = [
+    'payroll_total' => 0,
+    'budget'        => 0,
+    'site_deduction'=> 0,
+    'add_expenses'  => 0,
+    'net'           => 0,
+];
 
 try {
-    $payroll = dbGetPayroll($payroll_id);
+    if ($payroll_id > 0) {
+        $payroll = dbGetPayroll($payroll_id);
+        if (!$payroll) {
+            header('Location: payroll_view.php');
+            exit();
+        }
+        $site = dbGetSite((int)$payroll['site_id']);
+        if (!$site) {
+            header('Location: payroll_view.php');
+            exit();
+        }
+        $entries = prWithCalc(dbGetPayrollEntries($payroll_id));
+        $totals = prPayrollTotals($entries, $payroll);
+    } elseif ($site_id > 0) {
+        $site = dbGetSite($site_id);
+        if (!$site) {
+            header('Location: payroll_view.php');
+            exit();
+        }
+        $weeks = dbGetPayrolls($site_id);
+        usort($weeks, function ($a, $b) {
+            return strtotime($b['week_start']) <=> strtotime($a['week_start']);
+        });
+    } else {
+        $sites = dbSitesWithLatestPayroll();
+    }
 } catch (PDOException $e) {
-    $payroll = null;
+    $flash = ['danger', 'Could not load payroll data. Check the database connection and try again.'];
 }
 
-if (!$payroll) {
-    header('Location: sites.php');
-    exit();
-}
+$mode = $payroll ? 'report' : ($site ? 'picker-week' : 'picker-site');
 
 require_once __DIR__ . '/inc/header.php';
-
-$site = dbGetSite((int)$payroll['site_id']);
-$entries = prWithCalc(dbGetPayrollEntries($payroll_id));
-$totals = prPayrollTotals($entries, $payroll);
-
-$day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-$prev_start = date('Y-m-d', strtotime($payroll['week_start'] . ' -7 days'));
-$prev_end = date('Y-m-d', strtotime($payroll['week_end'] . ' -7 days'));
 ?>
 
+<?php if (isset($flash)): ?>
+    <?php foreach ((array)$flash as $f): ?>
+        <div class="alert alert-<?php echo $f[0]; ?> flash-toast alert-dismissible fade show" role="alert">
+            <?php echo htmlspecialchars(is_array($f[1]) ? '' : $f[1]); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endforeach; ?>
+<?php endif; ?>
+
+<?php if ($mode === 'picker-site'): ?>
+
+<div class="page-head">
+    <h3><i class="bi bi-eye"></i> View Payroll Report</h3>
+    <small class="text-muted">Pick a site, then a week.</small>
+</div>
+
+<div class="content-card">
+    <?php if (!$sites): ?>
+        <p class="text-muted mb-0">No sites yet.</p>
+    <?php else: ?>
+        <div class="row">
+            <?php foreach ($sites as $s): ?>
+                <div class="col-md-6 col-xl-4">
+                    <a href="payroll_view.php?site_id=<?php echo (int)$s['id']; ?>"
+                        class="border rounded p-3 mb-3 d-flex justify-content-between align-items-center text-decoration-none text-reset"
+                        style="display:flex;">
+                        <span>
+                            <span class="fw-semibold"><i class="bi bi-building"></i> <?php echo htmlspecialchars($s['name']); ?></span>
+                            <span class="d-block text-muted small"><?php echo (int)$s['payroll_count']; ?> payroll weeks</span>
+                        </span>
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<?php elseif ($mode === 'picker-week'): ?>
+
+<div class="page-head">
+    <a href="payroll_view.php" class="btn btn-sm btn-outline-secondary mb-2"><i class="bi bi-arrow-left"></i> Sites</a>
+    <h3><i class="bi bi-eye"></i> <?php echo htmlspecialchars($site['name']); ?></h3>
+    <small class="text-muted">Pick the week to open its report.</small>
+</div>
+
+<div class="content-card">
+    <?php if (!$weeks): ?>
+        <p class="text-muted mb-0">No payroll weeks for this site yet.</p>
+    <?php else: ?>
+        <div class="list-group">
+            <?php foreach ($weeks as $w): ?>
+                <a href="payroll_view.php?payroll_id=<?php echo (int)$w['id']; ?>"
+                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><?php echo prDate($w['week_start']) . ' - ' . prDate($w['week_end']); ?></span>
+                    <span class="small text-muted"><?php echo (int)$w['entry_count']; ?> workers &middot; <?php echo prMoney($w['payroll_total']); ?></span>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<?php else: ?>
+
 <div class="no-print d-flex justify-content-between align-items-center mb-3">
-    <a href="payroll_form.php?payroll_id=<?php echo $payroll_id; ?>" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left"></i> Edit Entries
+    <a href="payroll_view.php?site_id=<?php echo (int)$payroll['site_id']; ?>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Weeks
     </a>
     <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
         <i class="bi bi-printer"></i> Print / Save PDF
     </button>
 </div>
+
+<?php
+$day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+$prev_start = date('Y-m-d', strtotime($payroll['week_start'] . ' -7 days'));
+$prev_end = date('Y-m-d', strtotime($payroll['week_end'] . ' -7 days'));
+?>
 
 <div class="content-card">
     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
@@ -157,5 +258,7 @@ $prev_end = date('Y-m-d', strtotime($payroll['week_end'] . ' -7 days'));
         </div>
     </div>
 </div>
+
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/inc/footer.php'; ?>

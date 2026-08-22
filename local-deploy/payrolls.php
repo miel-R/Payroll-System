@@ -1,6 +1,7 @@
 <?php
 // E:\PAYROLL\payrolls.php
-// Weekly payroll periods for a site. Add, list and delete a week.
+// Add Payroll hub: no site_id -> pick-card list of every site.
+// With ?site_id=X -> that site's weekly payroll periods (add / edit / delete).
 
 require_once __DIR__ . '/config/session.php';
 payroll_session_start();
@@ -12,26 +13,39 @@ require_once __DIR__ . '/config/DBpayroll.php';
 require_once __DIR__ . '/config/actions.php';
 
 $page_title = 'Payrolls';
-$active_page = 'sites';
+$active_page = 'payroll';
 
 $is_admin = currentUserRole() === 'admin';
 
 $site_id = (int)($_GET['site_id'] ?? 0);
+$flash = [];
 
-try {
-    $site = dbGetSite($site_id);
-} catch (PDOException $e) {
-    $site = null;
-}
-
-if (!$site) {
-    header('Location: sites.php');
-    exit();
+if ($site_id > 0) {
+    try {
+        $site = dbGetSite($site_id);
+    } catch (PDOException $e) {
+        $site = null;
+    }
+    if (!$site) {
+        header('Location: payrolls.php');
+        exit();
+    }
+    try {
+        $payrolls = dbGetPayrolls($site_id);
+    } catch (PDOException $e) {
+        $payrolls = [];
+        $flash[] = ['danger', 'Could not load payroll weeks. Check the database connection and try again.'];
+    }
+} else {
+    try {
+        $sites = dbSitesWithLatestPayroll();
+    } catch (PDOException $e) {
+        $sites = [];
+        $flash[] = ['danger', 'Could not load sites. Check the database connection and try again.'];
+    }
 }
 
 require_once __DIR__ . '/inc/header.php';
-
-$flash = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $res = run_action((string)($_POST['action'] ?? ''), [
@@ -46,25 +60,159 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($res['render'] === 'redirect' && !empty($res['data']['url'])) {
         echo '<script>setTimeout(function(){window.location.replace(' . json_encode($res['data']['url']) . ');}, 800);</script>';
     }
-    if ($res['render'] === 'pdf' && !empty($res['data']['pdf'])) {
-        echo '<script>'
-            . 'var b=' . json_encode($res['data']['pdf']) . ';'
-            . 'var a=document.createElement("a");'
-            . 'a.href=URL.createObjectURL(new Blob([Uint8Array.from(atob(b),function(c){return c.charCodeAt(0);})],{type:"application/pdf"}));'
-            . 'a.download=' . json_encode($res['data']['filename'] ?? 'backup.pdf') . ';'
-            . 'document.body.appendChild(a);a.click();'
-            . 'setTimeout(function(){window.location.reload();},1400);'
-            . '</script>';
-    }
 }
-
-$payrolls = dbGetPayrolls($site_id);
 ?>
+
+<?php if ($site_id === 0): ?>
 
 <div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
-        <a href="site_workers.php?site_id=<?php echo (int)$site_id; ?>"
-            class="btn btn-sm btn-outline-secondary mb-2"><i class="bi bi-arrow-left"></i> Workers</a>
+        <h3><i class="bi bi-plus-circle"></i> Add Payroll</h3>
+        <small class="text-muted">Pick a site, then add its weekly payroll ("BALI BINYE" budget included).</small>
+    </div>
+</div>
+
+<?php foreach ($flash as $f): ?>
+    <div class="alert alert-<?php echo $f[0]; ?> flash-toast alert-dismissible fade show" role="alert">
+        <?php echo $f[1]; ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+<?php endforeach; ?>
+
+<div class="content-card">
+    <?php if (!$sites): ?>
+        <p class="text-muted mb-0">
+            No sites yet. <a href="sites.php">Add a site</a> to get started.
+        </p>
+    <?php else: ?>
+        <div class="row">
+            <?php foreach ($sites as $s): ?>
+                <div class="col-md-6 col-xl-4">
+                    <div class="border rounded p-3 mb-3 d-flex flex-column h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <a href="payrolls.php?site_id=<?php echo (int)$s['id']; ?>" class="fw-semibold text-decoration-none">
+                                    <i class="bi bi-building"></i> <?php echo htmlspecialchars($s['name']); ?>
+                                </a>
+                                <div class="text-muted small">
+                                    <?php echo (int)$s['worker_count']; ?> workers &middot;
+                                    <?php echo (int)$s['payroll_count']; ?> payroll weeks
+                                </div>
+                            </div>
+                            <span class="badge text-bg-light"><?php echo (int)$s['latest_entries']; ?>/<?php echo (int)$s['worker_count']; ?> entries</span>
+                        </div>
+                        <?php if (!empty($s['latest_payroll_id'])): ?>
+                            <div class="row text-muted small text-center my-2">
+                                <div class="col-6">
+                                    <div>Latest week</div>
+                                    <strong><?php echo prDate($s['latest_week_start']) . ' - ' . prDate($s['latest_week_end']); ?></strong>
+                                </div>
+                                <div class="col-3">
+                                    <div>Payroll</div>
+                                    <strong><?php echo prMoney($s['latest_total']); ?></strong>
+                                </div>
+                                <div class="col-3">
+                                    <div>Cash Adv.</div>
+                                    <strong><?php echo prMoney($s['latest_budget']); ?></strong>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-muted small my-2">No payroll weeks yet.</div>
+                        <?php endif; ?>
+                        <div class="d-flex gap-2 mt-auto flex-wrap">
+                            <?php if ($is_admin): ?>
+                                <a href="payrolls.php?site_id=<?php echo (int)$s['id']; ?>"
+                                    class="btn btn-sm btn-primary flex-fill">
+                                    <i class="bi bi-calendar-week"></i> Manage Weeks
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-bs-toggle="modal"
+                                    data-bs-target="#addPayrollModal" data-site="<?php echo (int)$s['id']; ?>"
+                                    data-site-name="<?php echo htmlspecialchars($s['name']); ?>">
+                                    <i class="bi bi-plus-circle"></i> Add Week
+                                </button>
+                            <?php else: ?>
+                                <a href="payrolls.php?site_id=<?php echo (int)$s['id']; ?>"
+                                    class="btn btn-sm btn-outline-secondary flex-fill">
+                                    <i class="bi bi-calendar-week"></i> View Weeks
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<?php if ($is_admin && !empty($sites)): ?>
+    <?php
+    $today = date('Y-m-d');
+    $week_start_default = date('Y-m-d', strtotime('last sunday', strtotime($today . ' +1 day')));
+    $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
+    ?>
+    <div class="modal fade" id="addPayrollModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="payrolls.php" data-api>
+                    <?php echo csrf_field(); ?>
+                    <input type="hidden" name="action" value="payroll.add">
+                    <input type="hidden" name="site_id" id="addPayrollSiteId" value="">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add Payroll Week - <span id="addPayrollSiteName"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label" for="addWeekStart">Week Start</label>
+                                <input type="date" class="form-control" id="addWeekStart" name="week_start"
+                                    value="<?php echo $week_start_default; ?>" required>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label" for="addWeekEnd">Week End</label>
+                                <input type="date" class="form-control" id="addWeekEnd" name="week_end"
+                                    value="<?php echo $week_end_default; ?>" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="addBudget">Budget / Cash Advance (BALI BINYE)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="addBudget" name="budget" value="0">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="addDeduction">Site Deduction</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="addDeduction" name="site_deduction" value="0">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="addExpenses">Add. Expenses</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="addExpenses" name="add_expenses" value="0">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Add Payroll</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-bs-target="#addPayrollModal"]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    document.getElementById('addPayrollSiteId').value = btn.getAttribute('data-site') || '';
+                    document.getElementById('addPayrollSiteName').textContent = btn.getAttribute('data-site-name') || '';
+                });
+            });
+        });
+    </script>
+<?php endif; ?>
+
+<?php else: ?>
+
+<div class="page-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <a href="payrolls.php" class="btn btn-sm btn-outline-secondary mb-2"><i class="bi bi-arrow-left"></i> Sites</a>
         <h3><i class="bi bi-cash-stack"></i> <?php echo htmlspecialchars($site['name']); ?></h3>
         <small class="text-muted">One payroll per week. Budget = cash advance released to the engineer ("BALI BINYE").</small>
     </div>
@@ -250,6 +398,8 @@ $payrolls = dbGetPayrolls($site_id);
             </div>
         </div>
     </div>
+<?php endif; ?>
+
 <?php endif; ?>
 
 <?php require_once __DIR__ . '/inc/footer.php'; ?>

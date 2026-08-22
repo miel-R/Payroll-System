@@ -78,7 +78,7 @@ if (currentUserRole() === 'admin') {
         integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"
         integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-    <link href="assets/css/app.css?v=12" rel="stylesheet">
+    <link href="assets/css/app.css?v=13" rel="stylesheet">
 </head>
 
 <body>
@@ -92,22 +92,23 @@ if (currentUserRole() === 'admin') {
                 </div>
             </div>
 
-<nav class="sidebar-nav">
+            <nav class="sidebar-nav">
+                <?php $current_page = basename($_SERVER['PHP_SELF']); ?>
                 <?php foreach ($app_nav as $nav): ?>
                     <?php if ($nav[3] === '#'): ?>
-                        <div class="dropdown">
-                            <a class="sidebar-link <?php echo $active_page === 'payroll' ? 'active' : ''; ?>"
-                                style="position: relative;">
-                                <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
-                                <i class="bi bi-chevron-down float-end ms-2"></i>
-                            </a>
-                            <ul class="dropdown-menu p-3 small" style="min-width: 180px; position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,.15);">
-<li><a class="dropdown-item" href="payroll_entries.php"><i class="bi bi-pencil-square"></i> Entry</a></li>
-<li><a class="dropdown-item" href="payroll_view.php"><i class="bi bi-eye"></i> View</a></li>
-<li><a class="dropdown-item" href="payrolls.php"><i class="bi bi-plus-circle"></i> Add Payroll</a></li>
-<li><hr class="dropdown-divider"></li>
-<li><a class="dropdown-item" href="ca_history.php"><i class="bi bi-clock-history"></i> CA History</a></li>
-</ul>
+                        <a class="sidebar-link <?php echo $active_page === 'payroll' ? 'active' : ''; ?>"
+                            href="payroll_entries.php">
+                            <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
+                        </a>
+                        <div class="sidebar-subnav">
+                            <a class="sidebar-sublink<?php echo $current_page === 'payroll_entries.php' ? ' active' : ''; ?>"
+                                href="payroll_entries.php"><i class="bi bi-pencil-square"></i> Entry</a>
+                            <a class="sidebar-sublink<?php echo $current_page === 'payroll_view.php' ? ' active' : ''; ?>"
+                                href="payroll_view.php"><i class="bi bi-eye"></i> View</a>
+                            <a class="sidebar-sublink<?php echo $current_page === 'payrolls.php' ? ' active' : ''; ?>"
+                                href="payrolls.php"><i class="bi bi-plus-circle"></i> Add Payroll</a>
+                            <a class="sidebar-sublink<?php echo $current_page === 'ca_history.php' ? ' active' : ''; ?>"
+                                href="ca_history.php"><i class="bi bi-clock-history"></i> CA History</a>
                         </div>
                     <?php else: ?>
                         <a class="sidebar-link <?php echo $active_page === $nav[0] ? 'active' : ''; ?>"
@@ -175,7 +176,7 @@ if (currentUserRole() === 'admin') {
                         <a class="btn btn-sm btn-outline-secondary" href="payroll_view.php?payroll_id=<?php echo (int)$sel_site['latest_payroll_id']; ?>" title="View / Print latest week">
                             <i class="bi bi-eye"></i> View
                         </a>
-                        <a class="btn btn-sm btn-outline-success" href="payroll.php#pca-history" title="Personal CA history for this site">
+                        <a class="btn btn-sm btn-outline-success" href="ca_history.php" title="Cash advance histories">
                             <i class="bi bi-clock-history"></i> CA
                         </a>
                         <?php else: ?>
