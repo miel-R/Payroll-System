@@ -12,6 +12,22 @@ require_once __DIR__ . '/DBgetPDO.php';
 // ============================================================
 
 /**
+ * Translate the canonical (MySQL-flavoured) DDL used across this app into
+ * the equivalent PostgreSQL DDL, so one schema definition serves both drivers.
+ */
+function dbDdlForDriver($mysqlDdl) {
+    if (dbDriver() !== 'pgsql') {
+        return $mysqlDdl;
+    }
+    $pg = str_replace(' INT AUTO_INCREMENT PRIMARY KEY', ' SERIAL PRIMARY KEY', $mysqlDdl);
+    // UNIQUE KEY uniq_name (a, b)  ->  UNIQUE (a, b)
+    $pg = preg_replace('/UNIQUE KEY\s+\S+\s*\(/', 'UNIQUE (', $pg);
+    // PostgreSQL has no table options suffix.
+    $pg = str_replace(') ENGINE=InnoDB', ')', $pg);
+    return $pg;
+}
+
+/**
  * Ensure payroll tables/columns exist for an older DB that predates a schema
  * change (CREATE TABLE IF NOT EXISTS never alters existing tables). Call once
  * per page load; harmless if everything is already up to date.
@@ -96,20 +112,20 @@ function dbEnsurePayrollSchema() {
         dbEnsureUserRoleColumn();
         if (!dbTableExists('payroll_entries')) {
             foreach ($schema as $sql) {
-                dbExecute($sql);
+                dbExecute(dbDdlForDriver($sql));
             }
             return;
         }
         // Existing payroll tables: ensure new tables/columns are added.
-        dbExecute("CREATE TABLE IF NOT EXISTS personal_cash_advances (
+        dbExecute(dbDdlForDriver("CREATE TABLE IF NOT EXISTS personal_cash_advances (
             id INT AUTO_INCREMENT PRIMARY KEY,
             site_employee_id INT NOT NULL,
             amount DECIMAL(12,2) NOT NULL DEFAULT 0,
             advance_date DATE NOT NULL,
             note VARCHAR(255) NOT NULL DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB");
-        dbExecute("CREATE TABLE IF NOT EXISTS worker_transfers (
+        ) ENGINE=InnoDB"));
+        dbExecute(dbDdlForDriver("CREATE TABLE IF NOT EXISTS worker_transfers (
             id INT AUTO_INCREMENT PRIMARY KEY,
             site_employee_id INT NOT NULL,
             to_site_id INT NOT NULL,
@@ -118,8 +134,8 @@ function dbEnsurePayrollSchema() {
             week_end DATE NOT NULL,
             note VARCHAR(255) NOT NULL DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB");
-        dbExecute("CREATE TABLE IF NOT EXISTS attendance (
+        ) ENGINE=InnoDB"));
+        dbExecute(dbDdlForDriver("CREATE TABLE IF NOT EXISTS attendance (
             id INT AUTO_INCREMENT PRIMARY KEY,
             site_employee_id INT NOT NULL,
             work_date DATE NOT NULL,
@@ -128,16 +144,16 @@ function dbEnsurePayrollSchema() {
             note VARCHAR(255) NOT NULL DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uniq_att_day (site_employee_id, work_date)
-        ) ENGINE=InnoDB");
-        $cols = dbFetchAll("SHOW COLUMNS FROM payroll_entries");
-        $names = array_column($cols, 'Field');
-        if (!in_array('personal_cash_advance', $names, true)) {
+        ) ENGINE=InnoDB"));
+        if (!dbColumnExists('payroll_entries', 'personal_cash_advance')) {
+            $after = dbDriver() === 'pgsql' ? '' : ' AFTER cash_advance';
             dbExecute("ALTER TABLE payroll_entries
-                ADD COLUMN personal_cash_advance DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER cash_advance");
+                ADD COLUMN personal_cash_advance DECIMAL(12,2) NOT NULL DEFAULT 0" . $after);
         }
-        if (!in_array('ot_daily', $names, true)) {
+        if (!dbColumnExists('payroll_entries', 'ot_daily')) {
+            $after = dbDriver() === 'pgsql' ? '' : ' AFTER attendance';
             dbExecute("ALTER TABLE payroll_entries
-                ADD COLUMN ot_daily VARCHAR(32) NOT NULL DEFAULT '' AFTER attendance");
+                ADD COLUMN ot_daily VARCHAR(32) NOT NULL DEFAULT ''" . $after);
         }
     } catch (PDOException $e) {
         error_log('dbEnsurePayrollSchema: ' . $e->getMessage());

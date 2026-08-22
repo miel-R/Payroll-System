@@ -37,12 +37,20 @@ class PayrollDbSessionHandler implements SessionHandlerInterface {
     public function write(string $id, string $data): bool {
         try {
             $pdo = dbconnect();
-            $stmt = $pdo->prepare(
-                'INSERT INTO sessions (id, data, last_accessed) VALUES (:id, :data, :ts)
-                 ON DUPLICATE KEY UPDATE data = :data2, last_accessed = :ts2'
-            );
-            $ts = time();
-            $stmt->execute([':id' => $id, ':data' => $data, ':ts' => $ts, ':data2' => $data, ':ts2' => $ts]);
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+                $stmt = $pdo->prepare(
+                    'INSERT INTO sessions (id, data, last_accessed) VALUES (:id, :data, :ts)
+                     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, last_accessed = EXCLUDED.last_accessed'
+                );
+                $stmt->execute([':id' => $id, ':data' => $data, ':ts' => time()]);
+            } else {
+                $stmt = $pdo->prepare(
+                    'INSERT INTO sessions (id, data, last_accessed) VALUES (:id, :data, :ts)
+                     ON DUPLICATE KEY UPDATE data = :data2, last_accessed = :ts2'
+                );
+                $ts = time();
+                $stmt->execute([':id' => $id, ':data' => $data, ':ts' => $ts, ':data2' => $data, ':ts2' => $ts]);
+            }
             return true;
         } catch (Exception $e) {
             return false;
@@ -86,11 +94,15 @@ function payroll_session_start() {
     if ($handler === null) {
         try {
             $pdo = dbconnect();
-            $pdo->exec('CREATE TABLE IF NOT EXISTS sessions (
+            $sessionsDdl = 'CREATE TABLE IF NOT EXISTS sessions (
                 id VARCHAR(128) PRIMARY KEY,
                 data TEXT NOT NULL,
                 last_accessed INT NOT NULL
-            ) ENGINE=InnoDB');
+            )';
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'pgsql') {
+                $sessionsDdl .= ' ENGINE=InnoDB';
+            }
+            $pdo->exec($sessionsDdl);
         } catch (Exception $e) {
             session_start();
             return;

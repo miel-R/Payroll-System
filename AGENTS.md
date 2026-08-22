@@ -13,7 +13,7 @@ Conventions for the PHP Payroll System in this repo.
 - `src/inc/header.php`, `src/inc/footer.php` - shared authenticated layout
   (set `$page_title` and `$active_page` = `dashboard` | `sites` | `dtr` | `users` first)
 - `src/config/DBconnect.php` - `dbCreds()` resolves credentials in order:
-  env vars (`DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`) -> gitignored
+  env vars (`DB_DRIVER`/`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSL`; `DB_DRIVER=pgsql` selects PostgreSQL - e.g. Supabase, default `mysql`) -> gitignored
   `src/config/db_credentials.php` -> local defaults (localhost/root//wip0).
   `dbconnect()` connects lazily and reuses a global `$pdo`.
 - `src/config/session.php` - `payroll_session_start()`; when env
@@ -24,7 +24,7 @@ Conventions for the PHP Payroll System in this repo.
   `dbUpdate`, `dbDelete`, `dbExecute`, `dbTableExists`) + user functions
   (incl. roles: `dbEnsureUserRoleColumn()`, `dbUpdateUserRole()`,
   `currentUserRole()`, `requireRole()`)
-- `database/schema.sql` - full SQL schema (all tables + `sessions`).
+- `database/schema.sql` (MySQL/MariaDB) and `database/schema-postgres.sql` (PostgreSQL/Supabase) - full SQL schemas (all tables + `sessions`).
 - `api/index.php` + `vercel.json` - Vercel deployment: front controller routes
   whitelisted page requests to the `public/*.php` scripts and serves `public/assets/`
   itself (catch-all route, `vercel-php@0.9.0` runtime).

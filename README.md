@@ -30,7 +30,7 @@ ignored by Apache.
 
 ## Tech stack
 
-- PHP 8+ with PDO (MySQL / MariaDB)
+- PHP 8+ with PDO (MySQL / MariaDB or PostgreSQL / Supabase via `DB_DRIVER=pgsql`)
 - Bootstrap 5.3 (CDN), Bootstrap Icons, Google Fonts (Inter)
 - Local CSS/JS in `public/assets/css/app.css` and `public/assets/js/app.js`
 
@@ -149,6 +149,52 @@ with `pdo_mysql` and `session`), wired up via `vercel.json` and an
 > The free Aiven service powers off after a long period of inactivity
 > (it auto-reactivates on the next connection) and is single-node, so it's
 > meant for small workloads — a good fit for this app.
+
+### Using Supabase (free PostgreSQL)
+
+Supabase gives you a free Postgres database — no credit card, and unlike
+Aiven it never powers off. The app supports it via `DB_DRIVER=pgsql`.
+
+1. Create a project at [supabase.com](https://supabase.com). When the project
+   is ready, open **SQL Editor → New query**, paste the whole contents of
+   `database/schema-postgres.sql`, and click **Run**.
+
+2. Get your connection details: **Connect → Session pooler**. You'll see a URI like:
+
+   ```
+   postgresql://postgres.rovquttsjzczilqoklvw:[YOUR-PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+   ```
+
+   > **Important:** on Vercel always use the **pooler** host
+   > (`aws-0-<region>.pooler.supabase.com`), not the direct
+   > `db.<ref>.supabase.co` host — the direct endpoint is IPv6-only and
+   > Vercel functions connect over IPv4.
+
+3. Set these environment variables in Vercel (Project → Settings →
+   Environment Variables):
+
+   | Variable              | Value                                              |
+   | --------------------- | -------------------------------------------------- |
+   | `DB_DRIVER`           | `pgsql`                                            |
+   | `DB_HOST`             | `aws-0-<region>.pooler.supabase.com`               |
+   | `DB_PORT`             | `5432`                                             |
+   | `DB_USER`             | `postgres.<your-project-ref>`                      |
+   | `DB_PASSWORD`         | your database password                             |
+   | `DB_NAME`             | `postgres`                                         |
+   | `DB_SSL`              | `1`                                                |
+   | `PAYROLL_DB_SESSIONS` | `1`                                                |
+
+4. Create an admin account, e.g. from your machine:
+
+   ```powershell
+   $env:DB_DRIVER='pgsql'; $env:DB_HOST='aws-0-ap-northeast-2.pooler.supabase.com'
+   $env:DB_USER='postgres.<ref>'; $env:DB_PASSWORD='...'; $env:DB_NAME='postgres'; $env:DB_SSL='1'
+   php tools/create_user.php     # seeds admin / admin123 — change it after first login
+   ```
+
+Switching between MySQL (Aiven/XAMPP) and Supabase is just the environment
+variables — no code changes (`src/config/DBconnect.php` builds the right PDO
+DSN from `DB_DRIVER`, and every schema/query helper branches on dialect).
 
 **Why DB-backed sessions?** Vercel functions are stateless — PHP file sessions
 live on an ephemeral filesystem, so `$_SESSION` would not survive between

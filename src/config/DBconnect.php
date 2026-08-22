@@ -13,6 +13,7 @@
  *   3. Local development defaults (XAMPP/WAMP: root, no password, wip0).
  */
 function dbCreds() {
+    $db_driver = '';
     $db_host = '';
     $db_port = '';
     $db_user = '';
@@ -25,12 +26,19 @@ function dbCreds() {
         require $env_file;
     }
 
+    $db_driver = strtolower(trim((string)(getenv('DB_DRIVER') ?: $db_driver)));
     $db_host = trim((string)(getenv('DB_HOST') ?: $db_host));
     $db_port = trim((string)(getenv('DB_PORT') ?: $db_port));
     $db_user = trim((string)(getenv('DB_USER') ?: $db_user));
     $db_pass = trim((string)(getenv('DB_PASSWORD') ?: $db_pass));
     $db_name = trim((string)(getenv('DB_NAME') ?: $db_name));
     $db_ssl = trim((string)(getenv('DB_SSL') ?: $db_ssl));
+
+    if ($db_driver !== 'pgsql' && $db_driver !== 'postgresql' && $db_driver !== 'postgres') {
+        $db_driver = 'mysql';
+    } else {
+        $db_driver = 'pgsql';
+    }
 
     if ($db_host === '' || $db_user === '' || $db_name === '') {
         // Local development fallback.
@@ -40,7 +48,20 @@ function dbCreds() {
         $db_name = $db_name !== '' ? $db_name : 'wip0';
     }
 
-    return [$db_host, $db_port, $db_user, $db_pass, $db_name, $db_ssl];
+    return [$db_driver, $db_host, $db_port, $db_user, $db_pass, $db_name, $db_ssl];
+}
+
+/**
+ * Driver name of the active PDO connection ('mysql' or 'pgsql').
+ * Lets the rest of the app branch on dialect where SQL differs.
+ */
+function dbDriver() {
+    global $pdo;
+    if ($pdo instanceof PDO) {
+        return $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    }
+    [$db_driver] = dbCreds();
+    return $db_driver;
 }
 
 function dbconnect() {
@@ -50,7 +71,7 @@ function dbconnect() {
         return $pdo;
     }
 
-    [$db_host, $db_port, $db_user, $db_pass, $db_name, $db_ssl] = dbCreds();
+    [$db_driver, $db_host, $db_port, $db_user, $db_pass, $db_name, $db_ssl] = dbCreds();
 
     // Vercel's PHP lambda has an unreliable system resolver: getaddrinfo()
     // (used by mysqlnd/streams) fails for some hostnames, and gethostbyname()
@@ -71,34 +92,44 @@ function dbconnect() {
         }
     }
 
-    $dsn = "mysql:host=$db_host";
-    if ($db_port !== '') {
-        $dsn .= ";port=$db_port";
-    }
-    $dsn .= ";dbname=$db_name;charset=utf8mb4";
-
     $options = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ];
 
-    // Cloud hosts (Aiven, TiDB, ...) require TLS on their public endpoints.
-    // PHP 8.5 moved the pdo_mysql SSL attribute constants to Pdo\Mysql::
-    // (the PDO::MYSQL_ATTR_* aliases are deprecated). Resolve whichever set
-    // this PHP build exposes.
-    $ssl_ca_attr       = defined('Pdo\\Mysql::ATTR_SSL_CA')
-        ? constant('Pdo\\Mysql::ATTR_SSL_CA') : PDO::MYSQL_ATTR_SSL_CA;
-    $ssl_verify_attr   = defined('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT')
-        ? constant('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT') : PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT;
+    if ($db_driver === 'pgsql') {
+        $dsn = "pgsql:host=$db_host";
+        $dsn .= ';port=' . ($db_port !== '' ? $db_port : '5432');
+        $dsn .= ";dbname=$db_name";
+        if ($db_ssl === '1' || $db_ssl === 'true' || $db_ssl === 'on') {
+            // Supabase and other cloud Postgres endpoints require TLS.
+            $dsn .= ';sslmode=require';
+        }
+    } else {
+        $dsn = "mysql:host=$db_host";
+        if ($db_port !== '') {
+            $dsn .= ";port=$db_port";
+        }
+        $dsn .= ";dbname=$db_name;charset=utf8mb4";
 
-    if ($db_ssl === '1' || $db_ssl === 'true' || $db_ssl === 'on') {
-        $ca = (string)(getenv('DB_SSL_CA') ?: '');
-        if ($ca !== '' && is_file($ca)) {
-            $options[$ssl_ca_attr] = $ca;
-        } else {
-            // Encrypt the connection without verifying the server certificate
-            // (the practical path on Vercel, which cannot mount a CA file).
-            $options[$ssl_verify_attr] = false;
+        // Cloud MySQL hosts (Aiven, TiDB, ...) require TLS on their public
+        // endpoints. PHP 8.5 moved the pdo_mysql SSL attribute constants to
+        // Pdo\Mysql:: (the PDO::MYSQL_ATTR_* aliases are deprecated). Resolve
+        // whichever set this PHP build exposes.
+        $ssl_ca_attr       = defined('Pdo\\Mysql::ATTR_SSL_CA')
+            ? constant('Pdo\\Mysql::ATTR_SSL_CA') : PDO::MYSQL_ATTR_SSL_CA;
+        $ssl_verify_attr   = defined('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT')
+            ? constant('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT') : PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT;
+
+        if ($db_ssl === '1' || $db_ssl === 'true' || $db_ssl === 'on') {
+            $ca = (string)(getenv('DB_SSL_CA') ?: '');
+            if ($ca !== '' && is_file($ca)) {
+                $options[$ssl_ca_attr] = $ca;
+            } else {
+                // Encrypt the connection without verifying the server certificate
+                // (the practical path on Vercel, which cannot mount a CA file).
+                $options[$ssl_verify_attr] = false;
+            }
         }
     }
 
@@ -108,7 +139,21 @@ function dbconnect() {
         error_log("Database Connection Error: " . $e->getMessage());
         die("Database connection failed. Please try again later.");
     }
-    
+
+    // Managed Postgres/MySQL tiers limit concurrent connections (Supabase
+    // free tier especially). Vercel's PHP worker can stay warm across
+    // requests, so drop the PDO the moment this request/process ends —
+    // every page reopens lazily on demand via dbconnect(). This also covers
+    // hard exits (header()+die redirects) that never reach the footer.
+    static $shutdown_registered = false;
+    if (!$shutdown_registered) {
+        register_shutdown_function(function () {
+            global $pdo;
+            $pdo = null;
+        });
+        $shutdown_registered = true;
+    }
+	
     return $pdo;
 }
 

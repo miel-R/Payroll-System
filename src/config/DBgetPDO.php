@@ -118,7 +118,7 @@ function dbGetAllUsers($order_by = 'id', $order = 'ASC') {
 function dbCreateUser($username, $email, $password, $role = 'admin') {
     dbconnect();
     global $pdo;
-    
+
     $role = in_array($role, ['admin', 'finance'], true) ? $role : 'admin';
     $hashed_password = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
     $sql = "INSERT INTO users (username, email, password, role) VALUES (:username, :email, :password, :role)";
@@ -129,9 +129,22 @@ function dbCreateUser($username, $email, $password, $role = 'admin') {
         ":password" => $hashed_password,
         ":role" => $role
     ]);
-    $id = $pdo->lastInsertId();
+    $id = dbLastInsertId('users');
     $stmt = null;
     return $id;
+}
+
+/**
+ * Last inserted auto-increment/serial id, portable across drivers.
+ * MySQL's PDO returns it with no argument; PostgreSQL needs the
+ * sequence name (our schema uses "<table>_id_seq" for every id column).
+ */
+function dbLastInsertId($table) {
+    global $pdo;
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+        return $pdo->lastInsertId($table . '_id_seq');
+    }
+    return $pdo->lastInsertId();
 }
 
 /**
@@ -288,10 +301,9 @@ function dbEnsureUserRoleColumn() {
         if (!dbTableExists('users')) {
             return;
         }
-        $cols = dbFetchAll("SHOW COLUMNS FROM users");
-        $names = array_column($cols, 'Field');
-        if (!in_array('role', $names, true)) {
-            dbExecute("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin' AFTER email");
+        if (!dbColumnExists('users', 'role')) {
+            $after = dbDriver() === 'pgsql' ? '' : ' AFTER email';
+            dbExecute("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'" . $after);
         }
     } catch (PDOException $e) {
         error_log('dbEnsureUserRoleColumn: ' . $e->getMessage());
@@ -407,7 +419,7 @@ function dbInsert($table, $data) {
     $sql = "INSERT INTO $table (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $placeholders) . ")";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($data);
-    $id = $pdo->lastInsertId();
+    $id = dbLastInsertId($table);
     $stmt = null;
     return $id;
 }
@@ -477,11 +489,32 @@ function dbDelete($table, $where) {
 function dbTableExists($table) {
     dbconnect();
     global $pdo;
-    
-    $sql = "SHOW TABLES LIKE :table";
-    $stmt = $pdo->prepare($sql);
+
+    $schema = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? 'public' : 'database()';
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema = $schema AND table_name = :table"
+    );
     $stmt->execute([":table" => $table]);
-    $exists = $stmt->rowCount() > 0;
+    $exists = (int)$stmt->fetchColumn() > 0;
+    $stmt = null;
+    return $exists;
+}
+
+/**
+ * Check whether a column exists on a table (driver-portable).
+ */
+function dbColumnExists($table, $column) {
+    dbconnect();
+    global $pdo;
+
+    $schema = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? 'public' : 'database()';
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = $schema AND table_name = :table AND column_name = :column"
+    );
+    $stmt->execute([":table" => $table, ":column" => $column]);
+    $exists = (int)$stmt->fetchColumn() > 0;
     $stmt = null;
     return $exists;
 }
