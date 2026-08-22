@@ -101,11 +101,11 @@ if (currentUserRole() === 'admin') {
                                 <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="payrolls.php"><i class="bi bi-pencil-square"></i> Entry</a></li>
-                                <li><a class="dropdown-item" href="payroll_view.php"><i class="bi bi-eye"></i> View</a></li>
-                                <li><a class="dropdown-item" href="payroll.php"><i class="bi bi-plus-circle"></i> Add Payroll</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="payroll.php#pca-history"><i class="bi bi-clock-history"></i> CA History</a></li>
+<li><a class="dropdown-item" href="payroll_entries.php"><i class="bi bi-pencil-square"></i> Entry</a></li>
+<li><a class="dropdown-item" href="payroll_view.php"><i class="bi bi-eye"></i> View</a></li>
+<li><a class="dropdown-item" href="payrolls.php"><i class="bi bi-plus-circle"></i> Add Payroll</a></li>
+<li><hr class="dropdown-divider"></li>
+<li><a class="dropdown-item" href="ca_history.php"><i class="bi bi-clock-history"></i> CA History</a></li>
                             </ul>
                         </div>
                     <?php else: ?>

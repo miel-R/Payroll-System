@@ -68,6 +68,8 @@ $allowed = [
     'logout.php',
     'contact.php',
     'ajax.php',
+    'payroll_entries.php',
+    'ca_history.php',
 ];
 
 $name = $path === '/' ? 'index.php' : basename($path);
