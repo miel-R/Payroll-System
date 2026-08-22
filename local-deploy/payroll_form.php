@@ -6,11 +6,18 @@
 // Side actions: Personal Cash Advance ledger + transfer to another site.
 // Finance role is redirected to the read-only view.
 
-$page_title = 'Edit Payroll Entries';
-$active_page = 'sites';
-require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/config/session.php';
+payroll_session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit();
+}
+require_once __DIR__ . '/config/DBpayroll.php';
 require_once __DIR__ . '/config/actions.php';
 requireRole('admin');
+
+$page_title = 'Edit Payroll Entries';
+$active_page = 'sites';
 
 $is_admin = true;
 $payroll_id = (int)($_GET['payroll_id'] ?? 0);
@@ -25,6 +32,8 @@ if (!$payroll) {
     header('Location: sites.php');
     exit();
 }
+
+require_once __DIR__ . '/inc/header.php';
 
 $site = dbGetSite((int)$payroll['site_id']);
 $site_id = (int)$site['id'];

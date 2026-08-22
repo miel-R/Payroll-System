@@ -2,10 +2,17 @@
 // E:\PAYROLL\payrolls.php
 // Weekly payroll periods for a site. Add, list and delete a week.
 
+require_once __DIR__ . '/config/session.php';
+payroll_session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit();
+}
+require_once __DIR__ . '/config/DBpayroll.php';
+require_once __DIR__ . '/config/actions.php';
+
 $page_title = 'Payrolls';
 $active_page = 'sites';
-require_once __DIR__ . '/inc/header.php';
-require_once __DIR__ . '/config/actions.php';
 
 $is_admin = currentUserRole() === 'admin';
 
@@ -21,6 +28,8 @@ if (!$site) {
     header('Location: sites.php');
     exit();
 }
+
+require_once __DIR__ . '/inc/header.php';
 
 $flash = [];
 

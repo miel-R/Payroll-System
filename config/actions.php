@@ -129,6 +129,48 @@ function dtr_day_payload($site_id, $date) {
 // Handlers
 // ============================================================
 
+/**
+ * Re-snapshot the OT paid on the FOLLOWING week's payroll from this week's
+ * DTR. Week X's attendance is paid on week X+1, so whenever a week's
+ * attendance changes (DTR day save or payroll form save), any payroll entries
+ * that ALREADY exist for X+1 must be refreshed or they keep stale zeros.
+ * Only updates existing entries; never creates or deletes them.
+ * @return int number of entries refreshed
+ */
+function sync_next_week_ot($site_id, $week_start) {
+    $week_start = date('Y-m-d', strtotime((string)$week_start));
+    $week_end = date('Y-m-d', strtotime($week_start . ' +6 days'));
+    $nws = date('Y-m-d', strtotime($week_start . ' +7 days'));
+    $nwe = date('Y-m-d', strtotime($week_start . ' +13 days'));
+
+    $next = dbFetchOne(
+        "SELECT id FROM payrolls WHERE site_id = :s AND week_start = :ws AND week_end = :we",
+        [':s' => (int)$site_id, ':ws' => $nws, ':we' => $nwe]
+    );
+    if (!$next) {
+        return 0;
+    }
+    $rollup = dbWeekAttendanceByWorker((int)$site_id, $week_start, $week_end);
+    if (!$rollup) {
+        return 0;
+    }
+    $n = 0;
+    foreach (dbGetPayrollEntries((int)$next['id']) as $e) {
+        $k = (int)$e['site_employee_id'];
+        if (!isset($rollup[$k])) {
+            continue;
+        }
+        $ot = round((float)$rollup[$k]['ot_total'], 2);
+        $daily = (string)$rollup[$k]['ot_daily'];
+        if (abs((float)$e['ot_hours'] - $ot) < 0.005 && trim((string)$e['ot_daily']) === $daily) {
+            continue;
+        }
+        dbUpdate('payroll_entries', ['ot_hours' => $ot, 'ot_daily' => $daily], ['id' => (int)$e['id']]);
+        $n++;
+    }
+    return $n;
+}
+
 function act_site_add($ctx) {
     $name = trim((string)($ctx['post']['name'] ?? ''));
     if ($name === '') {
@@ -385,6 +427,9 @@ function act_payroll_save($ctx) {
         dbSavePayrollEntry($payroll_id, $k, $days, $ot, $ca, $ded, $att, $flat, $w['position'], $w['rate'], $pca, $ot_daily);
         $changes++;
     }
+    // This week's DTR (just re-saved from the grid) is paid NEXT week: keep
+    // next week's existing entries in sync so OT typed here actually shows up.
+    sync_next_week_ot($site_id, $week_start);
     return act_ok('success', 'Saved ' . $changes . ' entry update(s) and DTR attendance.', 'refresh');
 }
 
@@ -502,6 +547,11 @@ function act_dtr_save($ctx) {
             $saved++;
         }
     }
+    // This day belongs to week W whose OT is paid on W+1: refresh next
+    // week's existing payroll entries so DTR edits propagate immediately.
+    $ts = strtotime($date);
+    $day_ws = date('Y-m-d', $ts - (int)date('w', $ts) * 86400);
+    sync_next_week_ot($site_id, $day_ws);
     return act_ok(
         'success',
         'Attendance saved for ' . date('M d, Y', strtotime($date)) . '.',

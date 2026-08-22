@@ -144,7 +144,7 @@ $default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
     <?php endif; ?>
 </div>
 
-<div class="content-card">
+<div class="content-card" id="pca-history">
     <h4><i class="bi bi-cash-coin"></i> Personal Cash Advance History</h4>
 
     <div class="row g-3">
@@ -269,7 +269,7 @@ $default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
 </div>
     </div>
 
-<div class="content-card">
+<div class="content-card" id="ca-history">
     <h4><i class="bi bi-wallet2"></i> Cash Advance History</h4>
     <p class="text-muted small mb-3">The regular weekly cash advance deducted from each worker's pay (the "Cash Adv." entry).</p>
     <?php if (!$ca_history): ?>

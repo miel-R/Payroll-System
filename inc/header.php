@@ -18,6 +18,13 @@ if (!isset($_SESSION['user_id'])) {
 $page_title = isset($page_title) ? $page_title : 'Payroll System';
 $active_page = isset($active_page) ? $active_page : '';
 
+// Remember selected site in session
+if (isset($_GET['site_id'])) {
+    $_SESSION['last_site_id'] = (int)$_GET['site_id'];
+} elseif (!isset($_SESSION['last_site_id'])) {
+    $_SESSION['last_site_id'] = null;
+}
+
 require_once __DIR__ . '/../config/DBpayroll.php';
 
 // Self-heal older databases that predate the personal_cash_advance column.
@@ -49,7 +56,7 @@ function csrf_field() {
 $app_nav = [
     ['dashboard', 'Dashboard', 'bi-speedometer2', 'dashboard.php'],
     ['sites', 'Sites', 'bi-geo-alt', 'sites.php'],
-    ['payroll', 'Payroll', 'bi-cash-stack', 'payroll.php'],
+    ['payroll', 'Payroll', 'bi-cash-stack', '#'],
     ['payslip', 'Payslip', 'bi-receipt-cutoff', 'payslip.php'],
     ['dtr', 'DTR', 'bi-clipboard-check', 'dtr.php'],
 ];
@@ -87,10 +94,26 @@ if (currentUserRole() === 'admin') {
 
             <nav class="sidebar-nav">
                 <?php foreach ($app_nav as $nav): ?>
-                    <a class="sidebar-link <?php echo $active_page === $nav[0] ? 'active' : ''; ?>"
-                        href="<?php echo $nav[3]; ?>">
-                        <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
-                    </a>
+                    <?php if ($nav[3] === '#'): ?>
+                        <div class="dropdown">
+                            <a class="sidebar-link dropdown-toggle <?php echo $active_page === 'payroll' ? 'active' : ''; ?>"
+                                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="payrolls.php"><i class="bi bi-pencil-square"></i> Entry</a></li>
+                                <li><a class="dropdown-item" href="payroll_view.php"><i class="bi bi-eye"></i> View</a></li>
+                                <li><a class="dropdown-item" href="payroll.php"><i class="bi bi-plus-circle"></i> Add Payroll</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="payroll.php#pca-history"><i class="bi bi-clock-history"></i> CA History</a></li>
+                            </ul>
+                        </div>
+                    <?php else: ?>
+                        <a class="sidebar-link <?php echo $active_page === $nav[0] ? 'active' : ''; ?>"
+                            href="<?php echo $nav[3]; ?>">
+                            <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
+                        </a>
+                    <?php endif; ?>
                 <?php endforeach; ?>
             </nav>
 
@@ -113,6 +136,68 @@ if (currentUserRole() === 'admin') {
                     <i class="bi bi-list"></i>
                 </button>
                 <span class="app-topbar-title"><?php echo htmlspecialchars($page_title); ?></span>
+                <?php
+                // Site selector with quick actions for payroll pages
+                $sites = dbSitesWithLatestPayroll();
+                if (!empty($sites) && in_array($active_page, ['payroll', 'payslip', 'dtr', 'sites'], true)):
+                    $sel_site_id = isset($_GET['site_id']) ? (int)$_GET['site_id'] : 0;
+                    if ($sel_site_id === 0 && !empty($_SESSION['last_site_id'])) {
+                        $sel_site_id = (int)$_SESSION['last_site_id'];
+                    }
+                    $sel_site = null;
+                    if ($sel_site_id) {
+                        foreach ($sites as $s) { if ((int)$s['id'] === $sel_site_id) { $sel_site = $s; break; } }
+                    }
+                ?>
+                <div class="topbar-site-selector ms-3 d-flex align-items-center gap-2" style="max-width: 420px;">
+                    <label for="topbarSiteSelect" class="visually-hidden">Select site</label>
+                    <select class="form-select form-select-sm" id="topbarSiteSelect" aria-label="Select site">
+                        <option value="">Select a site...</option>
+                        <?php foreach ($sites as $s): ?>
+                            <option value="<?php echo (int)$s['id']; ?>" <?php echo $sel_site_id === (int)$s['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($s['name']); ?>
+                                <?php if (!empty($s['latest_payroll_id'])): ?>
+                                    (<?php echo prDate($s['latest_week_start']).'..'.prDate($s['latest_week_end']); ?>)
+                                <?php endif; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php if ($sel_site): ?>
+                    <div class="topbar-quick-actions d-flex gap-1 ms-2" style="min-width: 260px;">
+                        <a class="btn btn-sm btn-outline-primary" href="payrolls.php?site_id=<?php echo $sel_site['id']; ?>" title="All weeks for <?php echo htmlspecialchars($sel_site['name']); ?>">
+                            <i class="bi bi-grid-1x2"></i> Weeks
+                        </a>
+                        <?php if ($sel_site['latest_payroll_id']): ?>
+                        <a class="btn btn-sm btn-outline-primary" href="payroll_form.php?payroll_id=<?php echo (int)$sel_site['latest_payroll_id']; ?>" title="Edit entries for latest week">
+                            <i class="bi bi-pencil-square"></i> Edit
+                        </a>
+                        <a class="btn btn-sm btn-outline-secondary" href="payroll_view.php?payroll_id=<?php echo (int)$sel_site['latest_payroll_id']; ?>" title="View / Print latest week">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        <a class="btn btn-sm btn-outline-success" href="payroll.php#pca-history" title="Personal CA history for this site">
+                            <i class="bi bi-clock-history"></i> CA
+                        </a>
+                        <?php else: ?>
+                        <span class="btn btn-sm btn-outline-secondary disabled" title="No payroll weeks yet">
+                            <i class="bi bi-plus-circle"></i> Add Week
+                        </span>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                    <input type="hidden" name="site_id" id="topbarSiteId" value="<?php echo $sel_site_id; ?>">
+                </div>
+                <?php endif; ?>
+                <script>
+                    document.getElementById('topbarSiteSelect')?.addEventListener('change', function() {
+                        var url = new URL(window.location.href);
+                        if (this.value) {
+                            url.searchParams.set('site_id', this.value);
+                        } else {
+                            url.searchParams.delete('site_id');
+                        }
+                        window.location.href = url.toString();
+                    });
+                </script>
             </header>
 
             <main id="app-content" class="app-content">

@@ -2,9 +2,16 @@
 // E:\PAYROLL\payroll_view.php
 // Printable weekly payroll report, mirroring the source spreadsheet layout.
 
+require_once __DIR__ . '/config/session.php';
+payroll_session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit();
+}
+require_once __DIR__ . '/config/DBpayroll.php';
+
 $page_title = 'Payroll Report';
 $active_page = 'sites';
-require_once __DIR__ . '/inc/header.php';
 
 $payroll_id = (int)($_GET['payroll_id'] ?? 0);
 
@@ -18,6 +25,8 @@ if (!$payroll) {
     header('Location: sites.php');
     exit();
 }
+
+require_once __DIR__ . '/inc/header.php';
 
 $site = dbGetSite((int)$payroll['site_id']);
 $entries = prWithCalc(dbGetPayrollEntries($payroll_id));
