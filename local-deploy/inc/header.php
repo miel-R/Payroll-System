@@ -94,21 +94,30 @@ if (currentUserRole() === 'admin') {
 
             <nav class="sidebar-nav">
                 <?php $current_page = basename($_SERVER['PHP_SELF']); ?>
+                <?php $is_admin_nav = currentUserRole() === 'admin'; ?>
                 <?php foreach ($app_nav as $nav): ?>
                     <?php if ($nav[3] === '#'): ?>
                         <a class="sidebar-link <?php echo $active_page === 'payroll' ? 'active' : ''; ?>"
-                            href="payroll_entries.php">
+                            href="#payrollSubnav" data-bs-toggle="collapse" role="button"
+                            aria-expanded="<?php echo $active_page === 'payroll' ? 'true' : 'false'; ?>"
+                            aria-controls="payrollSubnav">
                             <i class="bi <?php echo $nav[2]; ?>"></i><span><?php echo $nav[1]; ?></span>
                         </a>
-                        <div class="sidebar-subnav">
-                            <a class="sidebar-sublink<?php echo $current_page === 'payroll_entries.php' ? ' active' : ''; ?>"
-                                href="payroll_entries.php"><i class="bi bi-pencil-square"></i> Entry</a>
-                            <a class="sidebar-sublink<?php echo $current_page === 'payroll_view.php' ? ' active' : ''; ?>"
-                                href="payroll_view.php"><i class="bi bi-eye"></i> View</a>
-                            <a class="sidebar-sublink<?php echo $current_page === 'payrolls.php' ? ' active' : ''; ?>"
-                                href="payrolls.php"><i class="bi bi-plus-circle"></i> Add Payroll</a>
-                            <a class="sidebar-sublink<?php echo $current_page === 'ca_history.php' ? ' active' : ''; ?>"
-                                href="ca_history.php"><i class="bi bi-clock-history"></i> CA History</a>
+                        <div class="collapse<?php echo $active_page === 'payroll' ? ' show' : ''; ?>" id="payrollSubnav">
+                            <div class="sidebar-subnav">
+                                <?php if ($is_admin_nav): ?>
+                                    <a class="sidebar-sublink<?php echo $current_page === 'payroll_entries.php' ? ' active' : ''; ?>"
+                                        href="payroll_entries.php"><i class="bi bi-pencil-square"></i> Entry</a>
+                                <?php endif; ?>
+                                <a class="sidebar-sublink<?php echo $current_page === 'payroll_view.php' ? ' active' : ''; ?>"
+                                    href="payroll_view.php"><i class="bi bi-eye"></i> View</a>
+                                <?php if ($is_admin_nav): ?>
+                                    <a class="sidebar-sublink<?php echo $current_page === 'payrolls.php' ? ' active' : ''; ?>"
+                                        href="payrolls.php"><i class="bi bi-plus-circle"></i> Add Payroll</a>
+                                <?php endif; ?>
+                                <a class="sidebar-sublink<?php echo $current_page === 'ca_history.php' ? ' active' : ''; ?>"
+                                    href="ca_history.php"><i class="bi bi-clock-history"></i> CA History</a>
+                            </div>
                         </div>
                     <?php else: ?>
                         <a class="sidebar-link <?php echo $active_page === $nav[0] ? 'active' : ''; ?>"
@@ -169,21 +178,23 @@ if (currentUserRole() === 'admin') {
                         <a class="btn btn-sm btn-outline-primary" href="payrolls.php?site_id=<?php echo $sel_site['id']; ?>" title="All weeks for <?php echo htmlspecialchars($sel_site['name']); ?>">
                             <i class="bi bi-grid-1x2"></i> Weeks
                         </a>
-                        <?php if ($sel_site['latest_payroll_id']): ?>
+                        <?php if ($is_admin_nav && $sel_site['latest_payroll_id']): ?>
                         <a class="btn btn-sm btn-outline-primary" href="payroll_form.php?payroll_id=<?php echo (int)$sel_site['latest_payroll_id']; ?>" title="Edit entries for latest week">
                             <i class="bi bi-pencil-square"></i> Edit
                         </a>
+                        <?php endif; ?>
+                        <?php if ($sel_site['latest_payroll_id']): ?>
                         <a class="btn btn-sm btn-outline-secondary" href="payroll_view.php?payroll_id=<?php echo (int)$sel_site['latest_payroll_id']; ?>" title="View / Print latest week">
                             <i class="bi bi-eye"></i> View
-                        </a>
-                        <a class="btn btn-sm btn-outline-success" href="ca_history.php" title="Cash advance histories">
-                            <i class="bi bi-clock-history"></i> CA
                         </a>
                         <?php else: ?>
                         <span class="btn btn-sm btn-outline-secondary disabled" title="No payroll weeks yet">
                             <i class="bi bi-plus-circle"></i> Add Week
                         </span>
                         <?php endif; ?>
+                        <a class="btn btn-sm btn-outline-success" href="ca_history.php" title="Cash advance histories">
+                            <i class="bi bi-clock-history"></i> CA
+                        </a>
                     </div>
                     <?php endif; ?>
                     <input type="hidden" name="site_id" id="topbarSiteId" value="<?php echo $sel_site_id; ?>">

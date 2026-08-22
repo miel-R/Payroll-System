@@ -133,9 +133,16 @@ require_once __DIR__ . '/inc/header.php';
 <?php else: ?>
 
 <div class="no-print d-flex justify-content-between align-items-center mb-3">
-    <a href="payroll_view.php?site_id=<?php echo (int)$payroll['site_id']; ?>" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left"></i> Weeks
-    </a>
+    <?php if (currentUserRole() === 'admin'): ?>
+        <a href="payroll_form.php?payroll_id=<?php echo (int)$payroll['id']; ?>"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil-square"></i> Edit Entries
+        </a>
+    <?php else: ?>
+        <a href="payroll_view.php?site_id=<?php echo (int)$payroll['site_id']; ?>" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Weeks
+        </a>
+    <?php endif; ?>
     <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
         <i class="bi bi-printer"></i> Print / Save PDF
     </button>
