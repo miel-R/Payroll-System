@@ -490,7 +490,8 @@ function dbTableExists($table) {
     dbconnect();
     global $pdo;
 
-    $schema = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? 'public' : 'database()';
+    // PostgreSQL needs the schema as a quoted literal; MySQL takes DATABASE().
+    $schema = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? "'public'" : 'database()';
     $stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM information_schema.tables
          WHERE table_schema = $schema AND table_name = :table"
@@ -508,7 +509,7 @@ function dbColumnExists($table, $column) {
     dbconnect();
     global $pdo;
 
-    $schema = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? 'public' : 'database()';
+    $schema = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? "'public'" : 'database()';
     $stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM information_schema.columns
          WHERE table_schema = $schema AND table_name = :table AND column_name = :column"
