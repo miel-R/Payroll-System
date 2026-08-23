@@ -593,6 +593,24 @@
         bindTableFilters();
     };
 
+    // Tap-to-overwrite: focusing a text/number input selects its contents so
+    // you can type straight over old values (DTR OT hours, SMTWTFS grid,
+    // money fields...) instead of deleting first. A second click still
+    // places the caret normally, so precise edits stay possible.
+    document.addEventListener('focusin', function (e) {
+        const el = e.target;
+        if (!(el instanceof HTMLInputElement)) return;
+        if (el.readOnly || el.disabled) return;
+        if (el.classList.contains('no-select-all')) return;
+        const t = el.type;
+        if (!(t === 'text' || t === 'number' || t === 'search' ||
+              t === 'tel' || t === 'url' || t === 'email')) return;
+        try {
+            el.select();
+            el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        } catch (err) { /* some exotic input types cannot select */ }
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         applyTheme();
         bindSidebar();

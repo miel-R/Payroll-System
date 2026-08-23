@@ -442,14 +442,21 @@ a {
     appearance: none;
     -webkit-appearance: none;
     padding-left: 0.25rem;
-    padding-right: 1.45rem;
+    padding-right: 0.3rem;
     padding-top: 0.15rem;
     padding-bottom: 0.15rem;
     font-size: 0.8rem;
     font-weight: 600;
     border-radius: 8px;
-    background-position: right 0.32rem center;
-    background-size: 11px 8px;
+}
+
+/* Single-letter P/A/H pills lose the chevron entirely: cleaner on small
+   grids, nothing for the centered letter to collide with. */
+.day-select,
+.form-select.text-center[name^="att"],
+.form-select.text-center[data-name^="att"] {
+    background-image: none !important;
+    padding-right: 0.3rem;
 }
 
 /* Centered narrow selects (DTR status etc.) need real arrow clearance */
