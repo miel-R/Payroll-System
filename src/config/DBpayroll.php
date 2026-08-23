@@ -577,20 +577,29 @@ function prOtDailyArray($ot_daily) {
 // ============================================================
 
 function dbPayrollGrandTotals() {
-    $site_count = (int)dbFetchColumn("SELECT COUNT(*) FROM sites");
-    $worker_count = (int)dbFetchColumn("SELECT COUNT(*) FROM site_employees");
-    $payroll_count = (int)dbFetchColumn("SELECT COUNT(*) FROM payrolls");
-    $entry_count = (int)dbFetchColumn("SELECT COUNT(*) FROM payroll_entries");
-    $total_payroll = (float)dbFetchColumn(
-        "SELECT COALESCE(SUM(
-            CASE WHEN pe.flat_pay > 0 THEN pe.flat_pay
-                 ELSE COALESCE(NULLIF(pe.rate, 0), se.rate) * pe.days_worked
-                      + (COALESCE(NULLIF(pe.rate, 0), se.rate) / 8) * pe.ot_hours
-            END), 0)
-         FROM payroll_entries pe
-         JOIN site_employees se ON se.id = pe.site_employee_id"
-    );
-    return compact('site_count', 'worker_count', 'payroll_count', 'entry_count', 'total_payroll');
+    // Single round-trip: all counts + grand total as one row of subselects.
+    $row = dbFetchOne(
+        "SELECT
+            (SELECT COUNT(*) FROM sites) AS site_count,
+            (SELECT COUNT(*) FROM site_employees) AS worker_count,
+            (SELECT COUNT(*) FROM payrolls) AS payroll_count,
+            (SELECT COUNT(*) FROM payroll_entries) AS entry_count,
+            (SELECT COALESCE(ROUND(SUM(
+                CASE WHEN pe.flat_pay > 0 THEN pe.flat_pay
+                     ELSE COALESCE(NULLIF(pe.rate, 0), se.rate) * pe.days_worked
+                          + (COALESCE(NULLIF(pe.rate, 0), se.rate) / 8) * pe.ot_hours
+                END), 2), 0)
+             FROM payroll_entries pe
+             JOIN site_employees se ON se.id = pe.site_employee_id) AS total_payroll"
+    ) ?: [];
+
+    return [
+        'site_count'    => (int)($row['site_count'] ?? 0),
+        'worker_count'  => (int)($row['worker_count'] ?? 0),
+        'payroll_count' => (int)($row['payroll_count'] ?? 0),
+        'entry_count'   => (int)($row['entry_count'] ?? 0),
+        'total_payroll' => (float)($row['total_payroll'] ?? 0),
+    ];
 }
 
 // ============================================================
