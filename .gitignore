@@ -22,3 +22,6 @@ assets/js/bootstrap*.js.map
 
 .vercel
 .env*
+
+# Local debug captures
+vlog*.txt
