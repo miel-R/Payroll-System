@@ -220,7 +220,7 @@ $default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
 
 <?php if ($is_admin): ?>
     <div class="modal fade" id="addPayrollModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="payroll.php" data-api>
                     <?php echo csrf_field(); ?>

@@ -41,6 +41,14 @@ try {
     $flash[] = ['danger', 'Could not load cash advance data. Check the database connection and try again.'];
 }
 
+// Optional site filter from the topbar selector (?site_id=X)
+$site_filter = (int)($_GET['site_id'] ?? 0);
+if ($site_filter > 0) {
+    $pca_ledger   = array_values(array_filter($pca_ledger,   fn($r) => (int)$r['site_id'] === $site_filter));
+    $pca_recovery = array_values(array_filter($pca_recovery, fn($r) => (int)$r['site_id'] === $site_filter));
+    $ca_history   = array_values(array_filter($ca_history,   fn($r) => (int)$r['site_id'] === $site_filter));
+}
+
 $ca_week_pairs = [];
 foreach ($ca_history as $c) {
     $ca_week_pairs[(string)$c['week_start']] = (string)$c['week_end'];
@@ -59,6 +67,21 @@ require_once __DIR__ . '/../src/inc/header.php';
     <h3><i class="bi bi-clock-history"></i> Cash Advance History</h3>
     <small class="text-muted">Personal CA ledger, repayments, and weekly cash advances.</small>
 </div>
+
+<?php if ($site_filter > 0): ?>
+    <?php
+    $filter_name = '';
+    foreach (dbSitesWithLatestPayroll() as $ts) {
+        if ((int)$ts['id'] === $site_filter) { $filter_name = $ts['name']; break; }
+    }
+    ?>
+    <div class="alert alert-info py-2 d-flex justify-content-between align-items-center flex-wrap gap-2" role="alert">
+        <span><i class="bi bi-funnel"></i>
+            Showing history for <strong><?php echo htmlspecialchars($filter_name !== '' ? $filter_name : ('Site #' . $site_filter)); ?></strong>.
+        </span>
+        <a href="ca_history.php" class="btn btn-sm btn-outline-primary">All sites</a>
+    </div>
+<?php endif; ?>
 
 <?php foreach ($flash as $f): ?>
     <div class="alert alert-<?php echo $f[0]; ?> flash-toast alert-dismissible fade show" role="alert">

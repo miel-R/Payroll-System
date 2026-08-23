@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $week_end_default = date('Y-m-d', strtotime($week_start_default . ' +6 days'));
     ?>
     <div class="modal fade" id="addPayrollModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="payrolls.php" data-api>
                     <?php echo csrf_field(); ?>
@@ -355,7 +355,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <?php if ($is_admin): ?>
     <div class="modal fade" id="payrollModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="payrolls.php?site_id=<?php echo (int)$site_id; ?>" data-api>
                     <?php echo csrf_field(); ?>

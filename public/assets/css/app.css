@@ -1088,3 +1088,16 @@ html {
     opacity: 1;
     transition: width 0.25s ease;
 }
+
+/* ===== MODALS: centered, scroll-safe, page stays put behind ===== */
+body.modal-open {
+    overflow: hidden;
+    touch-action: none;
+}
+.modal {
+    overscroll-behavior: contain;
+}
+.modal-dialog-scrollable .modal-body {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}

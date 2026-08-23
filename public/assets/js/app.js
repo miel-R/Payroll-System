@@ -91,7 +91,7 @@
             wrap.tabIndex = -1;
             wrap.setAttribute('aria-hidden', 'true');
             wrap.innerHTML =
-                '<div class="modal-dialog modal-dialog-centered">' +
+                '<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">' +
                 '  <div class="modal-content">' +
                 '    <div class="modal-body pt-4 pb-2 text-center">' +
                 '      <div class="mb-2" style="font-size:34px;color:var(--secondary-color)"><i class="bi bi-exclamation-triangle"></i></div>' +

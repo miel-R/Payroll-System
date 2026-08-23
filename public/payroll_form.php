@@ -316,7 +316,7 @@ $advances = $pca_advances_map[$k] ?? [];
 $balance = $pca_balances[$k] ?? 0.0;
 ?>
     <div class="modal fade" id="pcaModal<?php echo $k; ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-wallet2"></i> Personal Cash Advance - <?php echo htmlspecialchars($w['name']); ?></h5>
@@ -390,7 +390,7 @@ $balance = $pca_balances[$k] ?? 0.0;
     $k = (int)$w['id'];
 ?>
     <div class="modal fade" id="xferModal<?php echo $k; ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Transfer Worker - <?php echo htmlspecialchars($w['name']); ?></h5>

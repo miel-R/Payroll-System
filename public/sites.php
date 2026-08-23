@@ -177,7 +177,7 @@ try {
 
 <?php if ($is_admin): ?>
     <div class="modal fade" id="siteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="sites.php" data-api>
                     <?php echo csrf_field(); ?>

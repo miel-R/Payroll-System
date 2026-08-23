@@ -154,7 +154,7 @@ $workers = dbGetSiteEmployees($site_id);
 
 <?php if ($is_admin): ?>
     <div class="modal fade" id="workerModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="site_workers.php?site_id=<?php echo (int)$site_id; ?>" data-api>
                     <?php echo csrf_field(); ?>
