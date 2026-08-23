@@ -78,7 +78,7 @@ if (currentUserRole() === 'admin') {
         integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"
         integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-    <link href="assets/css/app.css?v=13" rel="stylesheet">
+    <link href="assets/css/app.css?v=14" rel="stylesheet">
 </head>
 
 <body>
@@ -174,26 +174,26 @@ if (currentUserRole() === 'admin') {
                         <?php endforeach; ?>
                     </select>
                     <?php if ($sel_site): ?>
-                    <div class="topbar-quick-actions d-flex gap-1 ms-2" style="min-width: 260px;">
+                    <div class="topbar-quick-actions d-flex gap-1 ms-2">
                         <a class="btn btn-sm btn-outline-primary" href="payrolls.php?site_id=<?php echo $sel_site['id']; ?>" title="All weeks for <?php echo htmlspecialchars($sel_site['name']); ?>">
-                            <i class="bi bi-grid-1x2"></i> Weeks
+                            <i class="bi bi-grid-1x2"></i> <span class="btn-label">Weeks</span>
                         </a>
                         <?php if ($is_admin_nav && $sel_site['latest_payroll_id']): ?>
                         <a class="btn btn-sm btn-outline-primary" href="payroll_form.php?payroll_id=<?php echo (int)$sel_site['latest_payroll_id']; ?>" title="Edit entries for latest week">
-                            <i class="bi bi-pencil-square"></i> Edit
+                            <i class="bi bi-pencil-square"></i> <span class="btn-label">Edit</span>
                         </a>
                         <?php endif; ?>
                         <?php if ($sel_site['latest_payroll_id']): ?>
                         <a class="btn btn-sm btn-outline-secondary" href="payroll_view.php?payroll_id=<?php echo (int)$sel_site['latest_payroll_id']; ?>" title="View / Print latest week">
-                            <i class="bi bi-eye"></i> View
+                            <i class="bi bi-eye"></i> <span class="btn-label">View</span>
                         </a>
                         <?php else: ?>
                         <span class="btn btn-sm btn-outline-secondary disabled" title="No payroll weeks yet">
-                            <i class="bi bi-plus-circle"></i> Add Week
+                            <i class="bi bi-plus-circle"></i> <span class="btn-label">Add Week</span>
                         </span>
                         <?php endif; ?>
                         <a class="btn btn-sm btn-outline-success" href="ca_history.php" title="Cash advance histories">
-                            <i class="bi bi-clock-history"></i> CA
+                            <i class="bi bi-clock-history"></i> <span class="btn-label">CA</span>
                         </a>
                     </div>
                     <?php endif; ?>

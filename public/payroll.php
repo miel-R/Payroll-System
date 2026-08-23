@@ -111,7 +111,7 @@ $default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
                         <?php else: ?>
                             <div class="text-muted small my-2">No payroll weeks yet.</div>
                         <?php endif; ?>
-                        <div class="d-flex gap-2 mt-auto">
+                        <div class="d-flex gap-2 mt-auto card-actions">
                             <?php if ($is_admin): ?>
                                 <button type="button" class="btn btn-sm btn-primary flex-fill" data-bs-toggle="modal"
                                     data-bs-target="#addPayrollModal" data-site="<?php echo (int)$s['id']; ?>"
@@ -185,7 +185,7 @@ $default_pca_week = $pca_week_pairs ? max(array_keys($pca_week_pairs)) : '';
                         <?php else: ?>
                             <div class="text-muted small my-2">No payroll weeks yet.</div>
                         <?php endif; ?>
-                        <div class="d-flex gap-2 mt-auto">
+                        <div class="d-flex gap-2 mt-auto card-actions">
                             <?php if ($is_admin): ?>
                                 <button type="button" class="btn btn-sm btn-primary flex-fill" data-bs-toggle="modal"
                                     data-bs-target="#addPayrollModal" data-site="<?php echo (int)$s['id']; ?>"

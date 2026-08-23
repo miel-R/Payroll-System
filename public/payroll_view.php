@@ -132,7 +132,7 @@ require_once __DIR__ . '/../src/inc/header.php';
 
 <?php else: ?>
 
-<div class="no-print d-flex justify-content-between align-items-center mb-3">
+<div class="no-print d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <?php if (currentUserRole() === 'admin'): ?>
         <a href="payroll_form.php?payroll_id=<?php echo (int)$payroll['id']; ?>"
            class="btn btn-outline-secondary btn-sm">
