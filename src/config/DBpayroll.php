@@ -652,6 +652,64 @@ function dbPersonalCaBalance($site_employee_id) {
     return round($given - $recovered, 2);
 }
 
+/**
+ * Balances (given - recovered) for MANY workers in exactly 2 round-trips.
+ * Returns [ site_employee_id => balance ].
+ */
+function dbPersonalCaBalances(array $se_ids) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $se_ids))));
+    if (!$ids) {
+        return [];
+    }
+    $in = implode(',', $ids);
+    $givenRows = dbFetchAll(
+        "SELECT site_employee_id, SUM(amount) AS g FROM personal_cash_advances
+         WHERE site_employee_id IN ($in) GROUP BY site_employee_id"
+    ) ?: [];
+    $recRows = dbFetchAll(
+        "SELECT site_employee_id, SUM(pe.personal_cash_advance) AS r
+         FROM payroll_entries pe
+         JOIN payrolls p ON p.id = pe.payroll_id
+         WHERE pe.site_employee_id IN ($in) GROUP BY pe.site_employee_id"
+    ) ?: [];
+
+    $g = [];
+    foreach ($givenRows as $x) {
+        $g[(int)$x['site_employee_id']] = (float)$x['g'];
+    }
+    $r = [];
+    foreach ($recRows as $x) {
+        $r[(int)$x['site_employee_id']] = (float)$x['r'];
+    }
+    $out = [];
+    foreach ($ids as $id) {
+        $out[$id] = round(($g[$id] ?? 0) - ($r[$id] ?? 0), 2);
+    }
+    return $out;
+}
+
+/**
+ * Personal CA advance ROWS for many workers in one round-trip.
+ * Returns [ site_employee_id => [advance row, ...] ] (newest first).
+ */
+function dbPersonalCaAdvancesGrouped(array $se_ids) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $se_ids))));
+    if (!$ids) {
+        return [];
+    }
+    $in = implode(',', $ids);
+    $rows = dbFetchAll(
+        "SELECT * FROM personal_cash_advances
+         WHERE site_employee_id IN ($in)
+         ORDER BY advance_date DESC, id DESC"
+    ) ?: [];
+    $out = [];
+    foreach ($rows as $row) {
+        $out[(int)$row['site_employee_id']][] = $row;
+    }
+    return $out;
+}
+
 // ============================================================
 // SITE TRANSFERS
 // ============================================================
@@ -920,9 +978,9 @@ function dbPersonalCaHistoryAll() {
 
     $balances = [];
     $givens = [];
-    foreach (array_unique(array_column($rows, 'site_employee_id')) as $se) {
-        $se = (int)$se;
-        $balances[$se] = dbPersonalCaBalance($se);
+    $se_ids = array_values(array_unique(array_map('intval', array_column($rows, 'site_employee_id'))));
+    foreach (dbPersonalCaBalances($se_ids) as $se => $bal) {
+        $balances[$se] = $bal;
         $givens[$se] = 0.0;
     }
     foreach ($rows as $r) {

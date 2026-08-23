@@ -40,6 +40,12 @@ $site_id = (int)$site['id'];
 $workers = dbGetSiteEmployees($site_id);
 $all_sites = dbGetSites();
 
+// Batch the per-worker Personal CA lookups: 2 round-trips total instead of
+// ~5 queries PER WORKER (this page was doing 75+ sequential queries).
+$worker_ids = array_map(fn($w) => (int)$w['id'], $workers);
+$pca_balances = dbPersonalCaBalances($worker_ids);
+$pca_advances_map = dbPersonalCaAdvancesGrouped($worker_ids);
+
 $flash = [];
 $day_labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -187,7 +193,7 @@ $totals = prPayrollTotals($entries, $payroll);
                     $pca = $e ? (float)$e['personal_cash_advance'] : 0;
                     $ded = $e ? (float)$e['deduction'] : 0;
                     $flat = $e ? (float)$e['flat_pay'] : 0;
-                    $pca_balance = dbPersonalCaBalance($k);
+                    $pca_balance = $pca_balances[$k] ?? 0.0;
                 ?>
                     <div class="col-md-6 col-xl-4">
                         <div class="worker-card border rounded p-3 h-100"
@@ -304,8 +310,8 @@ $totals = prPayrollTotals($entries, $payroll);
 <?php // Personal Cash Advance modals ?>
 <?php foreach ($workers as $w):
     $k = (int)$w['id'];
-    $advances = dbGetPersonalCashAdvances($k);
-    $balance = dbPersonalCaBalance($k);
+$advances = $pca_advances_map[$k] ?? [];
+$balance = $pca_balances[$k] ?? 0.0;
 ?>
     <div class="modal fade" id="pcaModal<?php echo $k; ?>" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
