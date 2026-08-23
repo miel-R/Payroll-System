@@ -611,11 +611,42 @@
         } catch (err) { /* some exotic input types cannot select */ }
     });
 
+    /* ===== Navigation loading bar ===== */
+    const loadingBar = document.createElement('div');
+    loadingBar.className = 'app-loading';
+    function startLoadingBar() {
+        loadingBar.classList.add('active');
+        loadingBar.style.width = '72%';
+    }
+    function resetLoadingBar() {
+        if (!loadingBar.classList.contains('active')) return;
+        loadingBar.style.width = '100%';
+        setTimeout(function () {
+            loadingBar.classList.remove('active');
+            loadingBar.style.width = '0';
+        }, 180);
+    }
+    window.addEventListener('pageshow', resetLoadingBar);
+    // Internal links only; AJAX forms (data-api) show toasts instead.
+    document.addEventListener('click', function (e) {
+        const a = e.target.closest && e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+        const href = a.getAttribute('href') || '';
+        if (!href || href.charAt(0) === '#' || /^(tel:|mailto:|javascript:)/i.test(href)) return;
+        if (/^https?:\/\//i.test(href) && href.indexOf(location.host) === -1) return;
+        startLoadingBar();
+    }, true);
+    document.addEventListener('submit', function (e) {
+        if (e.target.closest && e.target.closest('[data-api]')) return;
+        startLoadingBar();
+    }, true);
+
     document.addEventListener('DOMContentLoaded', function () {
         applyTheme();
         bindSidebar();
         const themeBtn = document.getElementById('themeToggle');
         if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
+        document.body.appendChild(loadingBar);
         PAYROLL.init();
     });
 

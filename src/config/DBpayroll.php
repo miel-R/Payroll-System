@@ -33,6 +33,21 @@ function dbDdlForDriver($mysqlDdl) {
  * per page load; harmless if everything is already up to date.
  */
 function dbEnsurePayrollSchema() {
+    // Self-heal only matters on first touch or after a schema change - not on
+    // every page load. Throttle: once per session hour, and warm workers
+    // skip entirely for 60s. A failed run sets no flags, so it retries.
+    static $worker_ok_until = 0;
+    if (time() < $worker_ok_until) {
+        return;
+    }
+    if (isset($_SESSION['schema_ok_until']) && time() < (int)$_SESSION['schema_ok_until']) {
+        $worker_ok_until = time() + 60;
+        return;
+    }
+    $mark_ok = function () use (&$worker_ok_until) {
+        $_SESSION['schema_ok_until'] = time() + 3600;
+        $worker_ok_until = time() + 60;
+    };
     $schema = [
         "CREATE TABLE IF NOT EXISTS sites (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -110,41 +125,50 @@ function dbEnsurePayrollSchema() {
     ];
     try {
         dbEnsureUserRoleColumn();
-        if (!dbTableExists('payroll_entries')) {
+        $existing = dbExistingTables(['payroll_entries', 'personal_cash_advances', 'worker_transfers', 'attendance']);
+        if (!in_array('payroll_entries', $existing, true)) {
             foreach ($schema as $sql) {
                 dbExecute(dbDdlForDriver($sql));
             }
+            $mark_ok();
             return;
         }
-        // Existing payroll tables: ensure new tables/columns are added.
-        dbExecute(dbDdlForDriver("CREATE TABLE IF NOT EXISTS personal_cash_advances (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            site_employee_id INT NOT NULL,
-            amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-            advance_date DATE NOT NULL,
-            note VARCHAR(255) NOT NULL DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB"));
-        dbExecute(dbDdlForDriver("CREATE TABLE IF NOT EXISTS worker_transfers (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            site_employee_id INT NOT NULL,
-            to_site_id INT NOT NULL,
-            days DECIMAL(5,1) NOT NULL DEFAULT 0,
-            week_start DATE NOT NULL,
-            week_end DATE NOT NULL,
-            note VARCHAR(255) NOT NULL DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB"));
-        dbExecute(dbDdlForDriver("CREATE TABLE IF NOT EXISTS attendance (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            site_employee_id INT NOT NULL,
-            work_date DATE NOT NULL,
-            status VARCHAR(1) NOT NULL DEFAULT '.',
-            ot_hours DECIMAL(5,1) NOT NULL DEFAULT 0,
-            note VARCHAR(255) NOT NULL DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uniq_att_day (site_employee_id, work_date)
-        ) ENGINE=InnoDB"));
+        // Existing payroll tables: create only the ones still missing.
+        $late_tables = [
+            'personal_cash_advances' => "CREATE TABLE IF NOT EXISTS personal_cash_advances (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                site_employee_id INT NOT NULL,
+                amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+                advance_date DATE NOT NULL,
+                note VARCHAR(255) NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB",
+            'worker_transfers' => "CREATE TABLE IF NOT EXISTS worker_transfers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                site_employee_id INT NOT NULL,
+                to_site_id INT NOT NULL,
+                days DECIMAL(5,1) NOT NULL DEFAULT 0,
+                week_start DATE NOT NULL,
+                week_end DATE NOT NULL,
+                note VARCHAR(255) NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB",
+            'attendance' => "CREATE TABLE IF NOT EXISTS attendance (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                site_employee_id INT NOT NULL,
+                work_date DATE NOT NULL,
+                status VARCHAR(1) NOT NULL DEFAULT '.',
+                ot_hours DECIMAL(5,1) NOT NULL DEFAULT 0,
+                note VARCHAR(255) NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_att_day (site_employee_id, work_date)
+            ) ENGINE=InnoDB",
+        ];
+        foreach ($late_tables as $name => $ddl) {
+            if (!in_array($name, $existing, true)) {
+                dbExecute(dbDdlForDriver($ddl));
+            }
+        }
         if (!dbColumnExists('payroll_entries', 'personal_cash_advance')) {
             $after = dbDriver() === 'pgsql' ? '' : ' AFTER cash_advance';
             dbExecute("ALTER TABLE payroll_entries
@@ -155,6 +179,7 @@ function dbEnsurePayrollSchema() {
             dbExecute("ALTER TABLE payroll_entries
                 ADD COLUMN ot_daily VARCHAR(32) NOT NULL DEFAULT ''" . $after);
         }
+        $mark_ok();
     } catch (PDOException $e) {
         error_log('dbEnsurePayrollSchema: ' . $e->getMessage());
     }
@@ -296,6 +321,52 @@ function dbGetPayrolls($site_id) {
 
 function dbGetPayroll($id) {
     return dbFetchOne("SELECT * FROM payrolls WHERE id = :id", [':id' => $id]);
+}
+
+/**
+ * Newest $limit payroll weeks for EVERY site in ONE round-trip.
+ * Uses a window function (PostgreSQL + MySQL 8+/MariaDB 10.2+).
+ * Returns: [ site_id => ['site_name','worker_count','weeks'=>[...]] ]
+ */
+function dbRecentPayrollsPerSite($limit = 5) {
+    $rows = dbFetchAll(
+        "SELECT ranked.*, s.name AS site_name,
+            (SELECT COUNT(*) FROM site_employees se WHERE se.site_id = ranked.site_id) AS worker_count,
+            (SELECT COUNT(*) FROM payroll_entries pe WHERE pe.payroll_id = ranked.id) AS entry_count,
+            COALESCE((
+                SELECT ROUND(SUM(
+                    CASE WHEN le.flat_pay > 0 THEN le.flat_pay
+                         ELSE COALESCE(NULLIF(le.rate, 0), lse.rate) * le.days_worked
+                              + (COALESCE(NULLIF(le.rate, 0), lse.rate) / 8) * le.ot_hours
+                    END), 2)
+                FROM payroll_entries le
+                JOIN site_employees lse ON lse.id = le.site_employee_id
+                WHERE le.payroll_id = ranked.id
+            ), 0) AS payroll_total
+         FROM (
+             SELECT x.*, ROW_NUMBER() OVER (PARTITION BY x.site_id ORDER BY x.week_start DESC) AS rn
+             FROM payrolls x
+         ) ranked
+         JOIN sites s ON s.id = ranked.site_id
+         WHERE ranked.rn <= :lim
+         ORDER BY s.name ASC, ranked.week_start DESC",
+        [':lim' => max(1, (int)$limit)]
+    ) ?: [];
+
+    $out = [];
+    foreach ($rows as $r) {
+        $sid = (int)$r['site_id'];
+        if (!isset($out[$sid])) {
+            $out[$sid] = [
+                'site_name'    => $r['site_name'],
+                'worker_count' => (int)$r['worker_count'],
+                'weeks'        => [],
+            ];
+        }
+        unset($r['rn'], $r['site_name'], $r['worker_count']);
+        $out[$sid]['weeks'][] = $r;
+    }
+    return $out;
 }
 
 function dbGetPayrollByWeek($site_id, $week_start, $week_end) {
@@ -766,7 +837,13 @@ function dbWeekAttendanceByWorker($site_id, $week_start, $week_end) {
  * hub site boxes.
  */
 function dbSitesWithLatestPayroll() {
-    return dbFetchAll(
+    // Called by the topbar AND page bodies; memoize per request so we pay
+    // one WAN round-trip instead of two-plus.
+    static $memo = null;
+    if ($memo !== null) {
+        return $memo;
+    }
+    $rows = dbFetchAll(
         "SELECT s.*,
             (SELECT COUNT(*) FROM site_employees se WHERE se.site_id = s.id) AS worker_count,
             (SELECT COUNT(*) FROM payrolls p WHERE p.site_id = s.id) AS payroll_count,
@@ -782,8 +859,8 @@ function dbSitesWithLatestPayroll() {
                     END), 2)
                 FROM payroll_entries le
                 JOIN site_employees lse ON lse.id = le.site_employee_id
-                WHERE le.payroll_id = lp.id
-            ), 0) AS latest_total,
+         WHERE le.payroll_id = lp.id
+             ), 0) AS latest_total,
             (SELECT COUNT(*) FROM payroll_entries le2 WHERE le2.payroll_id = lp.id) AS latest_entries
          FROM sites s
          LEFT JOIN payrolls lp ON lp.id = (
@@ -793,6 +870,8 @@ function dbSitesWithLatestPayroll() {
          )
          ORDER BY s.name ASC"
     ) ?: [];
+    $memo = $rows;
+    return $memo;
 }
 
 /**

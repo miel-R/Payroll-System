@@ -519,4 +519,33 @@ function dbColumnExists($table, $column) {
     $stmt = null;
     return $exists;
 }
+
+/**
+ * Which of the given tables exist? One round-trip instead of N.
+ * Returns the subset of $tables that exist.
+ */
+function dbExistingTables(array $tables) {
+    if (!$tables) {
+        return [];
+    }
+    dbconnect();
+    global $pdo;
+
+    $schema = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? "'public'" : 'database()';
+    $params = [];
+    $placeholders = [];
+    foreach (array_values($tables) as $i => $t) {
+        $key = ":t$i";
+        $placeholders[] = $key;
+        $params[$key] = $t;
+    }
+    $stmt = $pdo->prepare(
+        "SELECT LOWER(table_name) AS tn FROM information_schema.tables
+         WHERE table_schema = $schema AND table_name IN (" . implode(',', $placeholders) . ")"
+    );
+    $stmt->execute($params);
+    $found = array_column($stmt->fetchAll(), 'tn');
+    $stmt = null;
+    return $found ?: [];
+}
 ?>

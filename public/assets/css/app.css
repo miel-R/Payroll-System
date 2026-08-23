@@ -1052,3 +1052,25 @@ tr.has-value td {
         display: none;
     }
 }
+
+/* ===== PAGE LOADING BAR ===== */
+html {
+    background: var(--bg-body);
+}
+.app-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    width: 0;
+    background: linear-gradient(90deg, var(--brand-a), var(--brand-b));
+    box-shadow: 0 0 8px rgba(118, 75, 162, 0.55);
+    z-index: 3000;
+    opacity: 0;
+    transition: width 0.25s ease, opacity 0.3s ease 0.15s;
+    pointer-events: none;
+}
+.app-loading.active {
+    opacity: 1;
+    transition: width 0.25s ease;
+}

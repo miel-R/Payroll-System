@@ -73,24 +73,12 @@ function dbconnect() {
 
     [$db_driver, $db_host, $db_port, $db_user, $db_pass, $db_name, $db_ssl] = dbCreds();
 
-    // Vercel's PHP lambda has an unreliable system resolver: getaddrinfo()
-    // (used by mysqlnd/streams) fails for some hostnames, and gethostbyname()
-    // can too, while PHP's own dns_get_record() still resolves fine.
-    // Resolve the hostname to an IP here so the connect skips getaddrinfo.
-    if (!filter_var($db_host, FILTER_VALIDATE_IP)) {
-        $orig = $db_host;
-        $gb = gethostbyname($orig);
-        $ip = $gb;
-        if ($gb === $orig || !filter_var($gb, FILTER_VALIDATE_IP)) {
-            $recs = @dns_get_record($orig, DNS_A);
-            if (is_array($recs) && isset($recs[0]['ip'])) {
-                $ip = $recs[0]['ip'];
-            }
-        }
-        if ($ip !== $orig && filter_var($ip, FILTER_VALIDATE_IP)) {
-            $db_host = $ip;
-        }
-    }
+    // Vercel's PHP lambda sometimes fails getaddrinfo(); the old code ALWAYS
+    // pre-resolved (blocking seconds when the resolver was slow). Now we try
+    // the hostname directly first - pdo_pgsql/pdo_mysql resolve fine most of
+    // the time - and only fall back to manual A-record lookup + IP connect
+    // when the driver reports a name-resolution error.
+    static $resolved_ip_cache = null;
 
     $options = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -136,8 +124,37 @@ function dbconnect() {
     try {
         $pdo = new PDO($dsn, $db_user, $db_pass, $options);
     } catch (PDOException $e) {
-        error_log("Database Connection Error: " . $e->getMessage());
-        die("Database connection failed. Please try again later.");
+        // Name-resolution trouble? Resolve once (cached for this worker's
+        // lifetime) and retry through the IP.
+        $msg = strtolower($e->getMessage());
+        $dns_fail = strpos($msg, 'could not translate') !== false
+            || strpos($msg, 'getaddrinfo') !== false
+            || strpos($msg, 'name or service') !== false
+            || strpos($msg, 'no such host') !== false
+            || strpos($msg, 'temporary failure in name') !== false;
+        if ($dns_fail && !filter_var($db_host, FILTER_VALIDATE_IP)) {
+            $ip = $resolved_ip_cache ?? gethostbyname($db_host);
+            if ((!$ip || $ip === $db_host || !filter_var($ip, FILTER_VALIDATE_IP))) {
+                $recs = @dns_get_record($db_host, DNS_A);
+                $ip = is_array($recs) && isset($recs[0]['ip']) ? $recs[0]['ip'] : '';
+            }
+            if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
+                $resolved_ip_cache = $ip;
+                $retry_dsn = substr_replace($dsn, "host=$ip", 6, strlen("host=$db_host"));
+                try {
+                    $pdo = new PDO($retry_dsn, $db_user, $db_pass, $options);
+                } catch (PDOException $e2) {
+                    error_log("Database Connection Error: " . $e2->getMessage());
+                    die("Database connection failed. Please try again later.");
+                }
+            } else {
+                error_log("Database Connection Error: " . $e->getMessage());
+                die("Database connection failed. Please try again later.");
+            }
+        } else {
+            error_log("Database Connection Error: " . $e->getMessage());
+            die("Database connection failed. Please try again later.");
+        }
     }
 
     // Managed Postgres/MySQL tiers limit concurrent connections (Supabase

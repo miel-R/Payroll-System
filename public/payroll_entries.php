@@ -17,24 +17,12 @@ $is_admin = currentUserRole() === 'admin';
 
 $flash = [];
 
+// One round-trip for every site's newest 5 weeks (instead of a query per site).
+$grouped = [];
 try {
-    $sites = dbSitesWithLatestPayroll();
+    $grouped = dbRecentPayrollsPerSite(5);
 } catch (PDOException $e) {
-    $sites = [];
-    $flash[] = ['danger', 'Could not load sites. Check the database connection and try again.'];
-}
-
-$site_payrolls = [];
-foreach ($sites as $s) {
-    try {
-        $weeks = dbGetPayrolls((int)$s['id']);
-        usort($weeks, function ($a, $b) {
-            return strtotime($b['week_start']) <=> strtotime($a['week_start']);
-        });
-        $site_payrolls[(int)$s['id']] = array_slice($weeks, 0, 5);
-    } catch (PDOException $e) {
-        $site_payrolls[(int)$s['id']] = [];
-    }
+    $flash[] = ['danger', 'Could not load payroll weeks. Check the database connection and try again.'];
 }
 
 require_once __DIR__ . '/../src/inc/header.php';
@@ -55,33 +43,28 @@ require_once __DIR__ . '/../src/inc/header.php';
 <?php endforeach; ?>
 
 <div class="content-card">
-    <?php if (!$sites): ?>
+    <?php if (!$grouped): ?>
         <p class="text-muted mb-0">
-            No sites yet. <a href="sites.php">Add a site</a> to get started.
+            No payroll weeks yet. <a href="payrolls.php">Add one</a> to get started.
         </p>
     <?php else: ?>
         <div class="row">
-            <?php foreach ($sites as $s): ?>
-                <?php $weeks = $site_payrolls[(int)$s['id']]; ?>
+            <?php foreach ($grouped as $siteId => $g): ?>
+                <?php $weeks = $g['weeks']; ?>
                 <div class="col-md-6 col-xl-4">
                     <div class="border rounded p-3 mb-3 d-flex flex-column h-100">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <a href="payrolls.php?site_id=<?php echo (int)$s['id']; ?>" class="fw-semibold text-decoration-none">
-                                    <i class="bi bi-building"></i> <?php echo htmlspecialchars($s['name']); ?>
+                                <a href="payrolls.php?site_id=<?php echo $siteId; ?>" class="fw-semibold text-decoration-none">
+                                    <i class="bi bi-building"></i> <?php echo htmlspecialchars($g['site_name']); ?>
                                 </a>
-                                <div class="text-muted small"><?php echo (int)$s['worker_count']; ?> workers</div>
+                                <div class="text-muted small"><?php echo (int)$g['worker_count']; ?> workers</div>
                             </div>
-                            <span class="badge text-bg-light">last 5 of <?php echo (int)$s['payroll_count']; ?></span>
+                            <span class="badge text-bg-light">last <?php echo count($weeks); ?></span>
                         </div>
 
                         <?php if (!$weeks): ?>
-                            <div class="text-muted small my-2">
-                                No payroll weeks yet.
-                                <?php if ($is_admin): ?>
-                                    <a href="payrolls.php?site_id=<?php echo (int)$s['id']; ?>">Add one</a>.
-                                <?php endif; ?>
-                            </div>
+                            <div class="text-muted small my-2">No weeks yet.</div>
                         <?php else: ?>
                             <div class="list-group list-group-flush my-2">
                                 <?php foreach ($weeks as $w): ?>
@@ -91,14 +74,14 @@ require_once __DIR__ . '/../src/inc/header.php';
                                             <span class="fw-semibold">
                                                 <?php echo prDate($w['week_start']) . ' - ' . prDate($w['week_end']); ?>
                                             </span>
-                                            <span class="text-muted"><?php echo (int)$w['entry_count']; ?>/<?php echo (int)$s['worker_count']; ?></span>
+                                            <span class="text-muted"><?php echo (int)$w['entry_count']; ?>/<?php echo (int)$g['worker_count']; ?></span>
                                         </div>
                                     </a>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
 
-                        <a href="payrolls.php?site_id=<?php echo (int)$s['id']; ?>"
+                        <a href="payrolls.php?site_id=<?php echo $siteId; ?>"
                             class="small text-decoration-none mt-auto">View all weeks &raquo;</a>
                     </div>
                 </div>

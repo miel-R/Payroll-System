@@ -71,6 +71,20 @@ if (currentUserRole() === 'admin') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($page_title); ?> - Payroll System</title>
+    <script>
+        /* Apply the saved theme BEFORE first paint - kills the white flash. */
+        (function () {
+            try {
+                var t = localStorage.getItem('payroll-theme');
+                if (t !== 'light' && t !== 'dark') {
+                    t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                }
+                var d = document.documentElement;
+                d.setAttribute('data-theme', t);
+                d.setAttribute('data-bs-theme', t);
+            } catch (e) { /* private mode etc. */ }
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -78,7 +92,7 @@ if (currentUserRole() === 'admin') {
         integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"
         integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-    <link href="assets/css/app.css?v=15" rel="stylesheet">
+    <link href="assets/css/app.css?v=16" rel="stylesheet">
 </head>
 
 <body>
