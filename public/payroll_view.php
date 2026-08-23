@@ -177,7 +177,7 @@ $prev_end = date('Y-m-d', strtotime($payroll['week_end'] . ' -7 days'));
         will be paid on the <strong>NEXT</strong> week's payroll.
     </div>
 
-    <div class="table-responsive">
+                    <div class="table-responsive d-none d-lg-block">
         <table class="table table-bordered table-sm align-middle">
             <thead class="table-light">
                 <tr>
@@ -234,6 +234,78 @@ $prev_end = date('Y-m-d', strtotime($payroll['week_end'] . ' -7 days'));
                 <?php endif; ?>
             </tbody>
         </table>
+    </div>
+
+    <!-- Mobile: one card per worker (the 21-column grid is unreadable on phones) -->
+    <div class="d-lg-none">
+        <?php if (!$entries): ?>
+            <p class="text-muted mb-0">No entries yet.</p>
+        <?php else: ?>
+            <?php $i = 1; foreach ($entries as $e): ?>
+                <div class="border rounded p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="text-muted small">#<?php echo $i++; ?></span>
+                            <div class="fw-semibold"><?php echo htmlspecialchars($e['name']); ?></div>
+                            <div class="text-muted small">
+                                <?php echo htmlspecialchars($e['position'] ?: '-'); ?>
+                                &middot; <?php echo prMoney($e['rate']); ?>/day
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="small text-muted">NET</div>
+                            <div class="fw-bold text-success"><?php echo prMoney($e['net']); ?></div>
+                        </div>
+                    </div>
+
+                    <div class="row text-center small my-2">
+                        <div class="col-4">
+                            <div class="text-muted">Days</div>
+                            <strong><?php echo $e['days_worked']; ?></strong>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted">OT Hrs</div>
+                            <strong><?php echo $e['ot_hours']; ?></strong>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted">Gross</div>
+                            <strong><?php echo prMoney($e['gross']); ?></strong>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted">Basic</div>
+                            <?php echo prMoney($e['basic']); ?>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted">OT Pay</div>
+                            <?php echo prMoney($e['ot_pay']); ?>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted">Income</div>
+                            <?php echo prMoney($e['gross'] - $e['cash_advance'] - $e['personal_cash_advance']); ?>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted">Per. CA</div>
+                            <?php echo prMoney($e['personal_cash_advance']); ?>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted">Cash Adv.</div>
+                            <?php echo prMoney($e['cash_advance']); ?>
+                        </div>
+                    </div>
+
+                    <div class="d-flex text-center small border-top pt-2 mt-1">
+                        <?php
+                        $att = str_split(prNormAtt($e['attendance'] ?? ''));
+                        foreach (['S', 'M', 'T', 'W', 'T', 'F', 'S'] as $di => $dl): ?>
+                            <div class="flex-fill">
+                                <div class="text-muted"><?php echo $dl; ?></div>
+                                <strong><?php echo htmlspecialchars($att[$di] ?? '-'); ?></strong>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 
     <div class="row justify-content-end mt-3">

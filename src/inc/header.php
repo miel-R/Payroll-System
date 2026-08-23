@@ -92,7 +92,7 @@ if (currentUserRole() === 'admin') {
         integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"
         integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-    <link href="assets/css/app.css?v=16" rel="stylesheet">
+    <link href="assets/css/app.css?v=17" rel="stylesheet">
 </head>
 
 <body>
@@ -174,7 +174,7 @@ if (currentUserRole() === 'admin') {
                         foreach ($sites as $s) { if ((int)$s['id'] === $sel_site_id) { $sel_site = $s; break; } }
                     }
                 ?>
-                <div class="topbar-site-selector ms-3 d-flex align-items-center gap-2" style="max-width: 420px;">
+                <div class="topbar-site-selector d-flex align-items-center gap-2">
                     <label for="topbarSiteSelect" class="visually-hidden">Select site</label>
                     <select class="form-select form-select-sm" id="topbarSiteSelect" aria-label="Select site">
                         <option value="">Select a site...</option>
