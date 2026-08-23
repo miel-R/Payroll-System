@@ -641,6 +641,22 @@
         startLoadingBar();
     }, true);
 
+    /* iOS: pin the page while any Bootstrap modal is open (delegated, so
+       dynamically created modals are covered too). */
+    let modalScrollY = 0;
+    document.addEventListener('show.bs.modal', function () {
+        if (document.body.classList.contains('modal-open-lock')) return;
+        modalScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        document.body.style.top = '-' + modalScrollY + 'px';
+        document.body.classList.add('modal-open-lock');
+    });
+    document.addEventListener('hidden.bs.modal', function () {
+        if (!document.body.classList.contains('modal-open-lock')) return;
+        document.body.classList.remove('modal-open-lock');
+        document.body.style.top = '';
+        window.scrollTo(0, modalScrollY);
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         applyTheme();
         bindSidebar();

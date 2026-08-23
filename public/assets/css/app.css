@@ -1101,3 +1101,77 @@ body.modal-open {
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
 }
+
+/* ===== MOBILE PAYSLIPS: one per row, readable, note/math stacked ===== */
+@media (max-width: 768px) {
+    .payslip-sheet {
+        display: block;
+    }
+    .payslip-sheet > * + * {
+        margin-top: 12px;
+    }
+    .payslip-stub {
+        font-size: 0.8rem;
+    }
+    .payslip-stub .ps-title {
+        font-size: 0.85rem;
+    }
+    .payslip-stub .ps-site {
+        text-align: left;
+    }
+    .payslip-stub .ps-week {
+        font-size: 0.75rem;
+    }
+    .payslip-stub .ps-worker {
+        font-size: 0.85rem;
+    }
+    .payslip-stub .ps-meta-grid td,
+    .payslip-stub .ps-money-grid td {
+        font-size: 0.78rem;
+    }
+    .payslip-stub .ps-att th,
+    .payslip-stub .ps-att td {
+        padding: 4px 6px;
+        font-size: 0.8rem;
+    }
+    /* the side-by-side NOTE | MATH block stacks on phones */
+    table.ps-lower-grid,
+    table.ps-lower-grid tr,
+    table.ps-lower-grid td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .payslip-stub .ps-note-column {
+        width: auto;
+        padding-right: 0;
+        margin-bottom: 8px;
+    }
+    .payslip-stub .ps-math-column {
+        width: auto;
+    }
+    .payslip-stub .ps-note-box td {
+        font-size: 0.72rem;
+        line-height: 1.35;
+    }
+}
+
+/* ===== MODALS: pin the page on iOS while a modal is open =====
+   (iOS ignores overflow:hidden on body; without this the page behind
+   scrolls and drags the sticky topbar all over the screen) */
+body.modal-open-lock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+}
+@media (max-width: 576px) {
+    .modal-dialog {
+        max-width: calc(100% - 0.75rem);
+        margin: 0.375rem auto;
+    }
+    .modal-content {
+        border-radius: 12px;
+    }
+}

@@ -183,9 +183,6 @@ $prev_sat = $payroll ? prDate(date('Y-m-d', strtotime($payroll['week_start'] . '
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-lg-1 d-grid">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
-        </div>
     </form>
 </div>
 
