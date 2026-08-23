@@ -66,8 +66,10 @@ $prev_start = date('Y-m-d', strtotime($week_start . ' -7 days'));
 $prev_end = date('Y-m-d', strtotime($week_end . ' -7 days'));
 
 try {
-    $week_att = dbWeekAttendanceByWorker($site_id, $week_start, $week_end);
-    $prev_att = dbWeekAttendanceByWorker($site_id, $prev_start, $prev_end);
+    // Both weeks fetched in a single attendance query.
+    $two = dbTwoWeeksAttendance($site_id, $prev_start, $prev_end, $week_start, $week_end);
+    $week_att = $two['cur'];
+    $prev_att = $two['prev'];
 } catch (PDOException $e) {
     $week_att = [];
     $prev_att = [];

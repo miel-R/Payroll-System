@@ -246,15 +246,22 @@ function dbGetOrCreateEmployee($name) {
 // ============================================================
 
 function dbGetSiteEmployees($site_id) {
+    // Memoized per request - called repeatedly by rollups + page bodies.
+    static $memo = [];
+    $key = (int)$site_id;
+    if (array_key_exists($key, $memo)) {
+        return $memo[$key];
+    }
     $rows = dbFetchAll(
         "SELECT se.*, e.name
          FROM site_employees se
          JOIN employees e ON e.id = se.employee_id
          WHERE se.site_id = :site_id
          ORDER BY e.name ASC",
-        [':site_id' => $site_id]
+        [':site_id' => $key]
     );
-    return $rows ?: [];
+    $memo[$key] = $rows ?: [];
+    return $memo[$key];
 }
 
 function dbGetSiteEmployee($id) {
@@ -838,17 +845,8 @@ function dbGetAttendanceForDate($site_id, $work_date) {
  * Each worker: 7-char status codes (in date order), days (P=1,H=0.5),
  * ot_total, and ot_daily (7 daily OT values as a CSV).
  */
-function dbWeekAttendanceByWorker($site_id, $week_start, $week_end) {
-    $workers = dbGetSiteEmployees((int)$site_id);
-    $att = dbFetchAll(
-        "SELECT site_employee_id, work_date, status, ot_hours
-         FROM attendance
-         WHERE work_date BETWEEN :ws AND :we
-           AND site_employee_id IN (SELECT id FROM site_employees WHERE site_id = :site_id)
-         ORDER BY work_date ASC",
-        [':ws' => $week_start, ':we' => $week_end, ':site_id' => (int)$site_id]
-    );
-
+/** Shared grouping for attendance rows -> per-worker week map. */
+function dbGroupAttendanceRows(array $att, array $workers, $week_start, $week_end) {
     $map = [];
     $dates = [];
     $d = $week_start;
@@ -883,15 +881,47 @@ function dbWeekAttendanceByWorker($site_id, $week_start, $week_end) {
         $map[$se]['ot_daily'][$idx] += (float)$row['ot_hours'];
     }
 
-    foreach ($map as &$m) {
+    foreach ($map as $se => $m) {
         $m['days'] = round($m['days'], 1);
         $m['ot_total'] = round(array_sum($m['ot_daily']), 2);
         $m['ot_daily'] = implode(',', array_map(function ($v) {
             return sprintf('%g', $v);
         }, $m['ot_daily']));
+        $map[$se] = $m;
     }
-    unset($m);
     return $map;
+}
+
+function dbWeekAttendanceByWorker($site_id, $week_start, $week_end) {
+    $workers = dbGetSiteEmployees((int)$site_id);
+    $att = dbFetchAll(
+        "SELECT site_employee_id, work_date, status, ot_hours
+         FROM attendance
+         WHERE work_date BETWEEN :ws AND :we
+           AND site_employee_id IN (SELECT id FROM site_employees WHERE site_id = :site_id)
+         ORDER BY work_date ASC",
+        [':ws' => $week_start, ':we' => $week_end, ':site_id' => (int)$site_id]
+    );
+    return dbGroupAttendanceRows($att ?: [], $workers, $week_start, $week_end);
+}
+
+/**
+ * Previous + current week rollups in ONE attendance query.
+ * Returns [ 'prev' => weekMap, 'cur' => weekMap ].
+ */
+function dbTwoWeeksAttendance($site_id, $prev_start, $prev_end, $cur_start, $cur_end) {
+    $workers = dbGetSiteEmployees((int)$site_id);
+    $att = dbFetchAll(
+        "SELECT site_employee_id, work_date, status, ot_hours
+         FROM attendance
+         WHERE work_date BETWEEN :a AND :b
+           AND site_employee_id IN (SELECT id FROM site_employees WHERE site_id = :site_id)",
+        [':a' => $prev_start, ':b' => $cur_end, ':site_id' => (int)$site_id]
+    ) ?: [];
+    return [
+        'prev' => dbGroupAttendanceRows($att, $workers, $prev_start, $prev_end),
+        'cur'  => dbGroupAttendanceRows($att, $workers, $cur_start, $cur_end),
+    ];
 }
 
 // ============================================================
