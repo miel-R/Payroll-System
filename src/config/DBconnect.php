@@ -159,18 +159,27 @@ function dbconnect() {
 
     // Managed Postgres/MySQL tiers limit concurrent connections (Supabase
     // free tier especially). Vercel's PHP worker can stay warm across
-    // requests, so drop the PDO the moment this request/process ends —
-    // every page reopens lazily on demand via dbconnect(). This also covers
-    // hard exits (header()+die redirects) that never reach the footer.
+    // requests, so drop the PDO when this request ends - every page reopens
+    // lazily on demand via dbconnect(). This also covers hard exits
+    // (header()+die redirects) that never reach the footer.
+    //
+    // ORDER MATTERS: flush the session BEFORE releasing the PDO. PHP closes
+    // sessions after userspace shutdown functions, so without this the
+    // session write would find $pdo gone, open a SECOND connection (which
+    // intermittently fails under pooler limits) and silently lose the write
+    // -> regenerated CSRF token -> every POST looked like a forced logout.
     static $shutdown_registered = false;
     if (!$shutdown_registered) {
         register_shutdown_function(function () {
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                @session_write_close();
+            }
             global $pdo;
             $pdo = null;
         });
         $shutdown_registered = true;
     }
-	
+
     return $pdo;
 }
 
