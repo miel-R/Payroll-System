@@ -385,6 +385,14 @@ function act_payroll_save($ctx) {
         $week_dates[] = date('Y-m-d', strtotime($week_start . " +$i days"));
     }
 
+    // Batch buffers - the whole save lands in ~4 statements instead of
+    // ~20 queries PER WORKER.
+    $att_upsert_params = [];   // attendance rows that carry data
+    $att_delete_pairs  = [];   // "(se,'date')" cells emptied by this save
+    $entry_upsert_rows = [];
+    $entry_upsert_params = [];
+    $entry_delete_ids  = [];
+
     foreach ($workers as $w) {
         $k = (int)$w['id'];
         $pa = $prev_att[$k] ?? ['codes' => '.......', 'days' => 0.0, 'ot_total' => 0.0, 'ot_daily' => '0,0,0,0,0,0,0'];
@@ -395,7 +403,11 @@ function act_payroll_save($ctx) {
             $c = in_array($c, ['P', 'A', 'H', '.'], true) ? $c : '.';
             $codes[] = $c;
             $otd = (float)($post['otd_' . $k . '_' . $idx] ?? 0);
-            dbSaveAttendance($k, $date, $c, $otd);
+            if ($c === '.' && $otd <= 0) {
+                $att_delete_pairs[] = '(' . $k . ", '" . $date . "')";
+            } else {
+                array_push($att_upsert_params, $k, $date, $c, $otd);
+            }
         }
         $att = implode('', $codes);
         $days = 0;
@@ -419,14 +431,56 @@ function act_payroll_save($ctx) {
 
         if ($isEmpty) {
             if ($hasEntry) {
-                dbDelete('payroll_entries', ['id' => $entries_map[$k]['id']]);
+                $entry_delete_ids[] = (int)$entries_map[$k]['id'];
                 $changes++;
             }
             continue;
         }
-        dbSavePayrollEntry($payroll_id, $k, $days, $ot, $ca, $ded, $att, $flat, $w['position'], $w['rate'], $pca, $ot_daily);
+        array_push(
+            $entry_upsert_rows,
+            '(?,?,?,?,?,?,?,?,?,?,?,?)'
+        );
+        array_push(
+            $entry_upsert_params,
+            $payroll_id, $k, $days, $ot, $ca, $pca, $ded, $flat,
+            (string)$w['position'], (float)$w['rate'],
+            $att, $ot_daily
+        );
         $changes++;
     }
+
+    // --- flush batches ---
+    if ($att_delete_pairs) {
+        dbExecute(
+            "DELETE FROM attendance WHERE (site_employee_id, work_date) IN ("
+            . implode(',', $att_delete_pairs) . ")"
+        );
+    }
+    if ($att_upsert_params) {
+        $n = intdiv(count($att_upsert_params), 4);
+        $upsert = dbDriver() === 'pgsql'
+            ? " ON CONFLICT (site_employee_id, work_date) DO UPDATE SET status = EXCLUDED.status, ot_hours = EXCLUDED.ot_hours"
+            : " ON DUPLICATE KEY UPDATE status = VALUES(status), ot_hours = VALUES(ot_hours)";
+        dbExecute(
+            "INSERT INTO attendance (site_employee_id, work_date, status, ot_hours, note) VALUES "
+            . implode(',', array_fill(0, $n, '(?,?,?,?,?)')) . $upsert,
+            $att_upsert_params
+        );
+    }
+    foreach ($entry_delete_ids as $eid) {
+        dbDelete('payroll_entries', ['id' => $eid]);
+    }
+    if ($entry_upsert_rows) {
+        $upsert = dbDriver() === 'pgsql'
+            ? " ON CONFLICT (payroll_id, site_employee_id) DO UPDATE SET days_worked = EXCLUDED.days_worked, ot_hours = EXCLUDED.ot_hours, cash_advance = EXCLUDED.cash_advance, personal_cash_advance = EXCLUDED.personal_cash_advance, deduction = EXCLUDED.deduction, flat_pay = EXCLUDED.flat_pay, position = EXCLUDED.position, rate = EXCLUDED.rate, attendance = EXCLUDED.attendance, ot_daily = EXCLUDED.ot_daily"
+            : " ON DUPLICATE KEY UPDATE days_worked = VALUES(days_worked), ot_hours = VALUES(ot_hours), cash_advance = VALUES(cash_advance), personal_cash_advance = VALUES(personal_cash_advance), deduction = VALUES(deduction), flat_pay = VALUES(flat_pay), position = VALUES(position), rate = VALUES(rate), attendance = VALUES(attendance), ot_daily = VALUES(ot_daily)";
+        dbExecute(
+            "INSERT INTO payroll_entries (payroll_id, site_employee_id, days_worked, ot_hours, cash_advance, personal_cash_advance, deduction, flat_pay, position, rate, attendance, ot_daily) VALUES "
+            . implode(',', $entry_upsert_rows) . $upsert,
+            $entry_upsert_params
+        );
+    }
+
     // This week's DTR (just re-saved from the grid) is paid NEXT week: keep
     // next week's existing entries in sync so OT typed here actually shows up.
     sync_next_week_ot($site_id, $week_start);

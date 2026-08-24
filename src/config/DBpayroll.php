@@ -338,7 +338,7 @@ function dbGetPayroll($id) {
 function dbRecentPayrollsPerSite($limit = 5) {
     $rows = dbFetchAll(
         "SELECT ranked.*, s.name AS site_name,
-            (SELECT COUNT(*) FROM site_employees se WHERE se.site_id = ranked.site_id) AS worker_count,
+            (SELECT COUNT(*) FROM site_employees se WHERE se.site_id = s.id) AS worker_count,
             (SELECT COUNT(*) FROM payroll_entries pe WHERE pe.payroll_id = ranked.id) AS entry_count,
             COALESCE((
                 SELECT ROUND(SUM(
@@ -350,12 +350,11 @@ function dbRecentPayrollsPerSite($limit = 5) {
                 JOIN site_employees lse ON lse.id = le.site_employee_id
                 WHERE le.payroll_id = ranked.id
             ), 0) AS payroll_total
-         FROM (
+         FROM sites s
+         LEFT JOIN (
              SELECT x.*, ROW_NUMBER() OVER (PARTITION BY x.site_id ORDER BY x.week_start DESC) AS rn
              FROM payrolls x
-         ) ranked
-         JOIN sites s ON s.id = ranked.site_id
-         WHERE ranked.rn <= :lim
+         ) ranked ON ranked.site_id = s.id AND ranked.rn <= :lim
          ORDER BY s.name ASC, ranked.week_start DESC",
         [':lim' => max(1, (int)$limit)]
     ) ?: [];
@@ -369,6 +368,9 @@ function dbRecentPayrollsPerSite($limit = 5) {
                 'worker_count' => (int)$r['worker_count'],
                 'weeks'        => [],
             ];
+        }
+        if ($r['id'] === null) {
+            continue; // site with no payroll weeks yet - card shows empty state
         }
         unset($r['rn'], $r['site_name'], $r['worker_count']);
         $out[$sid]['weeks'][] = $r;
