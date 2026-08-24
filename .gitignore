@@ -25,3 +25,5 @@ assets/js/bootstrap*.js.map
 
 # Local debug captures
 vlog*.txt
+
+sess_srv.txt
