@@ -1154,10 +1154,13 @@ body.modal-open {
         padding: 4px 6px;
         font-size: 0.8rem;
     }
-    /* the side-by-side NOTE | MATH block stacks on phones */
+    /* the side-by-side NOTE | MATH block stacks on phones.
+       Child-combinators only - the INNER note/fin tables must stay real
+       tables so labels sit left and peso values right. */
     table.ps-lower-grid,
-    table.ps-lower-grid tr,
-    table.ps-lower-grid td {
+    table.ps-lower-grid > tbody,
+    table.ps-lower-grid > tbody > tr,
+    table.ps-lower-grid > tbody > tr > td {
         display: block;
         width: 100%;
         box-sizing: border-box;
@@ -1165,10 +1168,22 @@ body.modal-open {
     .payslip-stub .ps-note-column {
         width: auto;
         padding-right: 0;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
     }
     .payslip-stub .ps-math-column {
         width: auto;
+        border-top: 1px dashed #cbd5e1;
+        padding-top: 6px;
+    }
+    .payslip-stub .ps-fin-table td {
+        font-size: 0.78rem;
+        padding: 2px 0;
+    }
+    .payslip-stub .ps-fin-value {
+        white-space: nowrap;
+    }
+    .payslip-stub .ps-total-row {
+        font-size: 0.9rem;
     }
     .payslip-stub .ps-note-box td {
         font-size: 0.72rem;
