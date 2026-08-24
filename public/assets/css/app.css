@@ -1107,10 +1107,12 @@ html {
     transition: width 0.25s ease;
 }
 
-/* ===== MODALS: centered, scroll-safe, page stays put behind ===== */
+/* ===== MODALS: centered, scroll-safe, page stays put behind =====
+   NOTE: do NOT put touch-action:none here - <body> is an ancestor of the
+   modal, which would block scrolling inside dialogs on touch devices.
+   position:fixed below already freezes the page behind. */
 body.modal-open {
     overflow: hidden;
-    touch-action: none;
 }
 .modal {
     overscroll-behavior: contain;
